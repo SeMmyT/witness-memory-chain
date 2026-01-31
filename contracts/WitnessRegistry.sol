@@ -41,6 +41,15 @@ contract WitnessRegistry is Ownable {
     /// @notice Whether fees are burned (sent to 0xdead) or sent to treasury
     bool public burnFees;
 
+    /// @notice ETH dust fee required per anchor (for sustainability)
+    uint256 public ethDustFee;
+
+    /// @notice Minimum ETH dust fee (~$0.002)
+    uint256 public constant MIN_ETH_DUST_FEE = 0.00001 ether;
+
+    /// @notice Maximum ETH dust fee (~$0.20)
+    uint256 public constant MAX_ETH_DUST_FEE = 0.001 ether;
+
     // ============ Events ============
 
     event Anchored(
@@ -54,6 +63,7 @@ contract WitnessRegistry is Ownable {
     event FeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
     event BurnFeesUpdated(bool burn);
+    event EthDustFeeUpdated(uint256 oldFee, uint256 newFee);
 
     // ============ Errors ============
 
@@ -62,6 +72,10 @@ contract WitnessRegistry is Ownable {
     error EntryCountDecreased();
     error IndexOutOfBounds();
     error NoAnchorsForAgent();
+    error InsufficientEthFee();
+    error EthTransferFailed();
+    error EthDustFeeTooHigh();
+    error EthDustFeeTooLow();
 
     // ============ Constructor ============
 
@@ -69,19 +83,22 @@ contract WitnessRegistry is Ownable {
      * @notice Initialize the registry with token and fee configuration
      * @param _witnessToken Address of the WITNESS ERC20 token
      * @param _anchorFee Initial fee in WITNESS tokens (with decimals)
-     * @param _treasury Address to receive fees if not burning
-     * @param _burnFees Whether to burn fees (true) or send to treasury (false)
+     * @param _treasury Address to receive WITNESS fees (if not burning) and ETH dust fees
+     * @param _burnFees Whether to burn WITNESS fees (true) or send to treasury (false)
+     * @param _ethDustFee Initial ETH dust fee for sustainability (default: 0.0001 ether)
      */
     constructor(
         address _witnessToken,
         uint256 _anchorFee,
         address _treasury,
-        bool _burnFees
+        bool _burnFees,
+        uint256 _ethDustFee
     ) Ownable(msg.sender) {
         witnessToken = IERC20(_witnessToken);
         anchorFee = _anchorFee;
         treasury = _treasury;
         burnFees = _burnFees;
+        ethDustFee = _ethDustFee;
     }
 
     // ============ Core Functions ============
@@ -98,11 +115,20 @@ contract WitnessRegistry is Ownable {
         bytes32 chainRoot,
         uint64 entryCount,
         bytes calldata signature
-    ) external {
+    ) external payable {
         // Validate signature length (Ed25519 signatures are 64 bytes)
         if (signature.length != 64) revert InvalidSignatureLength();
 
-        // Collect fee
+        // Collect ETH dust fee for sustainability
+        if (ethDustFee > 0) {
+            if (msg.value < ethDustFee) revert InsufficientEthFee();
+
+            // Send all ETH to treasury
+            (bool success, ) = payable(treasury).call{value: msg.value}("");
+            if (!success) revert EthTransferFailed();
+        }
+
+        // Collect WITNESS token fee
         if (anchorFee > 0) {
             address feeTarget = burnFees ? address(0xdead) : treasury;
             bool success = witnessToken.transferFrom(msg.sender, feeTarget, anchorFee);
@@ -216,5 +242,16 @@ contract WitnessRegistry is Ownable {
     function setBurnFees(bool _burn) external onlyOwner {
         burnFees = _burn;
         emit BurnFeesUpdated(_burn);
+    }
+
+    /**
+     * @notice Update the ETH dust fee
+     * @param _fee New fee in wei (must be within MIN/MAX bounds)
+     */
+    function setEthDustFee(uint256 _fee) external onlyOwner {
+        if (_fee > MAX_ETH_DUST_FEE) revert EthDustFeeTooHigh();
+        if (_fee < MIN_ETH_DUST_FEE && _fee != 0) revert EthDustFeeTooLow();
+        emit EthDustFeeUpdated(ethDustFee, _fee);
+        ethDustFee = _fee;
     }
 }

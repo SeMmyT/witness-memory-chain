@@ -33,6 +33,7 @@ import {
   verifyAgainstBase,
   getWitnessBalance,
   getAnchorFee,
+  getEthDustFee,
 } from './anchor/base.js';
 import type { EntryType, Tier, ChainEntryInput, BaseAnchorConfig, AnchorProviderType } from './types.js';
 
@@ -555,12 +556,19 @@ program
 
         const receipt = await anchorToBase(dataDir, baseConfig, walletKey);
 
+        // Format ETH dust fee
+        const ethFeePaid = Number(receipt.ethDustFee) / 1e18;
+        const ethFeeUsd = ethFeePaid * 2000; // Rough ETH price estimate
+
         console.log('\nAnchor successful!');
         console.log(`  Transaction: ${receipt.txHash}`);
         console.log(`  Block: ${receipt.blockNumber}`);
         console.log(`  Chain root: ${receipt.chainRoot}`);
         console.log(`  Entry count: ${receipt.entryCount}`);
         console.log(`  Gas used: ${receipt.gasUsed}`);
+        if (receipt.ethDustFee > 0n) {
+          console.log(`  Dust fee: ${ethFeePaid.toFixed(6)} ETH (~$${ethFeeUsd.toFixed(2)}) -> treasury`);
+        }
 
         const explorerUrl = options.testnet
           ? `https://sepolia.basescan.org/tx/${receipt.txHash}`
@@ -838,10 +846,14 @@ program
       // Get anchor fee if registry is configured
       if (registryAddress) {
         const { fee, formatted: feeFormatted } = await getAnchorFee(baseConfig);
-        console.log(`\nAnchor Fee: ${feeFormatted} ${symbol}`);
+        const { fee: ethFee, formatted: ethFeeFormatted } = await getEthDustFee(baseConfig);
+
+        console.log(`\nAnchor Fees:`);
+        console.log(`  WITNESS: ${feeFormatted} ${symbol} (burned)`);
+        console.log(`  ETH dust: ${ethFeeFormatted} ETH (~$${(Number(ethFee) / 1e18 * 2000).toFixed(2)}) -> treasury`);
 
         const anchorsAvailable = fee > 0n ? Number(balance / fee) : 0;
-        console.log(`Anchors available: ${anchorsAvailable}`);
+        console.log(`\nAnchors available (by WITNESS): ${anchorsAvailable}`);
       }
 
       // Get ETH balance for gas

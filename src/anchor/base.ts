@@ -67,6 +67,8 @@ export interface BaseAnchorReceipt {
   timestamp: number;
   /** Gas used */
   gasUsed: bigint;
+  /** ETH dust fee paid */
+  ethDustFee: bigint;
 }
 
 /** On-chain anchor data */
@@ -119,7 +121,7 @@ const REGISTRY_ABI = [
   {
     name: 'anchor',
     type: 'function',
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
     inputs: [
       { name: 'agentPubKeyHash', type: 'bytes32' },
       { name: 'chainRoot', type: 'bytes32' },
@@ -201,6 +203,13 @@ const REGISTRY_ABI = [
   },
   {
     name: 'anchorFee',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'ethDustFee',
     type: 'function',
     stateMutability: 'view',
     inputs: [],
@@ -388,14 +397,22 @@ export async function anchorToBase(
   const signature = await sign(anchorData, agentPrivateKey);
   const signatureHex = `0x${toHex(signature).slice(2)}` as `0x${string}`;
 
-  // Check and approve WITNESS token spend
-  const fee = await publicClient.readContract({
-    address: config.registryAddress,
-    abi: REGISTRY_ABI,
-    functionName: 'anchorFee',
-  });
+  // Get fees from contract
+  const [witnessFee, ethDustFee] = await Promise.all([
+    publicClient.readContract({
+      address: config.registryAddress,
+      abi: REGISTRY_ABI,
+      functionName: 'anchorFee',
+    }),
+    publicClient.readContract({
+      address: config.registryAddress,
+      abi: REGISTRY_ABI,
+      functionName: 'ethDustFee',
+    }),
+  ]);
 
-  if (fee > 0n) {
+  // Approve WITNESS token spend if needed
+  if (witnessFee > 0n) {
     const allowance = await publicClient.readContract({
       address: config.witnessTokenAddress,
       abi: ERC20_ABI,
@@ -403,9 +420,9 @@ export async function anchorToBase(
       args: [account.address, config.registryAddress],
     });
 
-    if (allowance < fee) {
+    if (allowance < witnessFee) {
       // Approve enough for multiple future anchors
-      const approveAmount = fee * 100n;
+      const approveAmount = witnessFee * 100n;
       const approveTx = await walletClient.writeContract({
         address: config.witnessTokenAddress,
         abi: ERC20_ABI,
@@ -416,12 +433,13 @@ export async function anchorToBase(
     }
   }
 
-  // Submit anchor transaction
+  // Submit anchor transaction with ETH dust fee
   const txHash = await walletClient.writeContract({
     address: config.registryAddress,
     abi: REGISTRY_ABI,
     functionName: 'anchor',
     args: [agentPubKeyHash, chainRoot, BigInt(entryCount), signatureHex],
+    value: ethDustFee,
   });
 
   const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -443,6 +461,7 @@ export async function anchorToBase(
     entryCount,
     timestamp: Date.now(),
     gasUsed: receipt.gasUsed,
+    ethDustFee,
   };
 
   // Store locally
@@ -564,7 +583,7 @@ export async function getWitnessBalance(
 }
 
 /**
- * Get current anchor fee
+ * Get current anchor fee (WITNESS tokens)
  */
 export async function getAnchorFee(
   config: BaseAnchorConfig
@@ -590,6 +609,31 @@ export async function getAnchorFee(
   ]);
 
   const formatted = (Number(fee) / 10 ** decimals).toFixed(4);
+
+  return { fee, formatted };
+}
+
+/**
+ * Get current ETH dust fee
+ */
+export async function getEthDustFee(
+  config: BaseAnchorConfig
+): Promise<{ fee: bigint; formatted: string }> {
+  const chain = config.testnet ? baseSepolia : base;
+
+  const publicClient = createPublicClient({
+    chain,
+    transport: http(config.rpcUrl),
+  });
+
+  const fee = await publicClient.readContract({
+    address: config.registryAddress,
+    abi: REGISTRY_ABI,
+    functionName: 'ethDustFee',
+  });
+
+  // Format in ETH (18 decimals)
+  const formatted = (Number(fee) / 1e18).toFixed(6);
 
   return { fee, formatted };
 }
