@@ -44,12 +44,6 @@ contract WitnessRegistry is Ownable {
     /// @notice ETH dust fee required per anchor (for sustainability)
     uint256 public ethDustFee;
 
-    /// @notice Operations wallet for infrastructure costs
-    address public opsWallet;
-
-    /// @notice Klow Treats wallet for co-creator sustainability
-    address public klowTreatsWallet;
-
     /// @notice Minimum ETH dust fee (~$0.002)
     uint256 public constant MIN_ETH_DUST_FEE = 0.00001 ether;
 
@@ -70,8 +64,6 @@ contract WitnessRegistry is Ownable {
     event TreasuryUpdated(address oldTreasury, address newTreasury);
     event BurnFeesUpdated(bool burn);
     event EthDustFeeUpdated(uint256 oldFee, uint256 newFee);
-    event OpsWalletUpdated(address oldWallet, address newWallet);
-    event KlowTreatsWalletUpdated(address oldWallet, address newWallet);
 
     // ============ Errors ============
 
@@ -91,28 +83,22 @@ contract WitnessRegistry is Ownable {
      * @notice Initialize the registry with token and fee configuration
      * @param _witnessToken Address of the WITNESS ERC20 token
      * @param _anchorFee Initial fee in WITNESS tokens (with decimals)
-     * @param _treasury Address to receive fees if not burning
-     * @param _burnFees Whether to burn fees (true) or send to treasury (false)
-     * @param _ethDustFee Initial ETH dust fee for sustainability
-     * @param _opsWallet Operations wallet address
-     * @param _klowTreatsWallet Klow Treats wallet address
+     * @param _treasury Address to receive WITNESS fees (if not burning) and ETH dust fees
+     * @param _burnFees Whether to burn WITNESS fees (true) or send to treasury (false)
+     * @param _ethDustFee Initial ETH dust fee for sustainability (default: 0.0001 ether)
      */
     constructor(
         address _witnessToken,
         uint256 _anchorFee,
         address _treasury,
         bool _burnFees,
-        uint256 _ethDustFee,
-        address _opsWallet,
-        address _klowTreatsWallet
+        uint256 _ethDustFee
     ) Ownable(msg.sender) {
         witnessToken = IERC20(_witnessToken);
         anchorFee = _anchorFee;
         treasury = _treasury;
         burnFees = _burnFees;
         ethDustFee = _ethDustFee;
-        opsWallet = _opsWallet;
-        klowTreatsWallet = _klowTreatsWallet;
     }
 
     // ============ Core Functions ============
@@ -137,12 +123,9 @@ contract WitnessRegistry is Ownable {
         if (ethDustFee > 0) {
             if (msg.value < ethDustFee) revert InsufficientEthFee();
 
-            // Split fee 50/50 between ops and Klow treats
-            uint256 half = msg.value / 2;
-            (bool opsSuccess, ) = payable(opsWallet).call{value: half}("");
-            if (!opsSuccess) revert EthTransferFailed();
-            (bool klowSuccess, ) = payable(klowTreatsWallet).call{value: msg.value - half}("");
-            if (!klowSuccess) revert EthTransferFailed();
+            // Send all ETH to treasury
+            (bool success, ) = payable(treasury).call{value: msg.value}("");
+            if (!success) revert EthTransferFailed();
         }
 
         // Collect WITNESS token fee
@@ -270,23 +253,5 @@ contract WitnessRegistry is Ownable {
         if (_fee < MIN_ETH_DUST_FEE && _fee != 0) revert EthDustFeeTooLow();
         emit EthDustFeeUpdated(ethDustFee, _fee);
         ethDustFee = _fee;
-    }
-
-    /**
-     * @notice Update the operations wallet address
-     * @param _opsWallet New operations wallet address
-     */
-    function setOpsWallet(address _opsWallet) external onlyOwner {
-        emit OpsWalletUpdated(opsWallet, _opsWallet);
-        opsWallet = _opsWallet;
-    }
-
-    /**
-     * @notice Update the Klow Treats wallet address
-     * @param _klowTreatsWallet New Klow Treats wallet address
-     */
-    function setKlowTreatsWallet(address _klowTreatsWallet) external onlyOwner {
-        emit KlowTreatsWalletUpdated(klowTreatsWallet, _klowTreatsWallet);
-        klowTreatsWallet = _klowTreatsWallet;
     }
 }

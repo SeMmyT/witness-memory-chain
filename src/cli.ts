@@ -567,8 +567,7 @@ program
         console.log(`  Entry count: ${receipt.entryCount}`);
         console.log(`  Gas used: ${receipt.gasUsed}`);
         if (receipt.ethDustFee > 0n) {
-          console.log(`  Dust fee: ${ethFeePaid.toFixed(6)} ETH (~$${ethFeeUsd.toFixed(2)})`);
-          console.log(`    -> 50% ops, 50% Klow treats`);
+          console.log(`  Dust fee: ${ethFeePaid.toFixed(6)} ETH (~$${ethFeeUsd.toFixed(2)}) -> treasury`);
         }
 
         const explorerUrl = options.testnet
@@ -851,8 +850,7 @@ program
 
         console.log(`\nAnchor Fees:`);
         console.log(`  WITNESS: ${feeFormatted} ${symbol} (burned)`);
-        console.log(`  ETH dust: ${ethFeeFormatted} ETH (~$${(Number(ethFee) / 1e18 * 2000).toFixed(2)})`);
-        console.log(`    -> 50% ops, 50% Klow treats`);
+        console.log(`  ETH dust: ${ethFeeFormatted} ETH (~$${(Number(ethFee) / 1e18 * 2000).toFixed(2)}) -> treasury`);
 
         const anchorsAvailable = fee > 0n ? Number(balance / fee) : 0;
         console.log(`\nAnchors available (by WITNESS): ${anchorsAvailable}`);

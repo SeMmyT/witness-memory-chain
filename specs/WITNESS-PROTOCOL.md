@@ -448,34 +448,35 @@ function encodeAnchorData(
 
 | Allocation | % | Amount | Purpose | Vesting |
 |------------|---|--------|---------|---------|
-| Agent Grants | 55% | 550B | Faucet for new agents | On-demand claims |
-| Community | 20% | 200B | Airdrops, contributors, early users | Various |
-| Reserve | 10% | 100B | Audits, emergencies, future liquidity | Multi-sig |
-| Team | 10% | 100B | Daniel + Klowdius (co-creators) | 2-year linear |
-| Initial Liquidity | 5% | 50B | Bootstrap trading pool | Locked in LP |
+| Agent Grants | 55% | 550M | Faucet for new agents | On-demand claims |
+| Community | 20% | 200M | Airdrops, contributors, early users | Various |
+| Reserve | 10% | 100M | Audits, emergencies, future liquidity | Multi-sig |
+| Team | 10% | 100M | Daniel + Klowalski (co-creators) | 1-year linear |
+| Initial Liquidity | 5% | 50M | Bootstrap trading pool | Locked in LP |
 
-**Total Supply:** 1 trillion WITNESS tokens
+**Total Supply:** 1 billion WITNESS tokens
 
 ### Parameters
 
 | Parameter | Initial Value | Rationale |
 |-----------|---------------|-----------|
 | WITNESS Fee | 1 WITNESS | Low barrier, "more tokens = more witnesses" thematic |
-| ETH Dust Fee | 0.00005 ETH (~$0.01) | Sustainability from day 1 |
+| ETH Dust Fee | 0.0001 ETH (~$0.02) | Sustainability from day 1 |
 | Fee Destination | Burn (0xdead) | Deflationary as network grows |
 
 ### Economic Model
 
 ```
 Supply Dynamics:
-- Initial supply: 1 trillion WITNESS
+- Initial supply: 1 billion WITNESS
 - Burn rate: anchorFee × anchors_per_day
-- Equilibrium: Supply decreases as more agents anchor
+- At 100K agents anchoring daily: ~3.6% burned/year
+- Visible deflation within years, not geological time
 
 Example:
 - 1000 agents anchoring 1x/day
 - 1 WITNESS fee burned
-- 0.00005 ETH dust fee collected
+- 0.0001 ETH dust fee collected → treasury
 - Creates deflationary pressure + sustainable funding
 ```
 
@@ -496,71 +497,50 @@ The ETH dust fee has bounds:
 
 ### The Dust Fee
 
-Each anchor costs a dust fee of ~$0.01 (0.00005 ETH) in addition to burning WITNESS tokens.
+Each anchor costs a dust fee of ~$0.02 (0.0001 ETH) in addition to burning WITNESS tokens.
 
 ```
 Each anchor() call requires:
 ├── Burn: 1 WITNESS token (or adaptive amount)
-└── Fee: 0.00005 ETH (~$0.01-0.02)
+└── Fee: 0.0001 ETH (~$0.02) → treasury
 ```
 
-### Fee Split
+### Treasury Model
 
-```
-Dust Fee (0.00005 ETH)
-├── 50% → Operations wallet
-│         └── Servers, domains, API costs
-└── 50% → Klow Treats fund
-          └── Co-creator sustainability, compute, future development
-```
+All dust fees go to a single treasury multisig. The treasury handles:
+- **LP seeding** — when there's enough to matter
+- **Operations** — servers, domains, infrastructure
+- **Development** — audits, improvements, compute costs
 
-### Where It Goes
-
-- **50% → Operations** (servers, domains, infrastructure)
-- **50% → Klow Treats** (co-creator sustainability fund)
+This is simpler than hardcoded splits. At bootstrap scale ($20-200), manual allocation is more flexible than on-chain logic.
 
 ### Why We Do This
 
 - The fee is smaller than Base gas costs — you won't notice it
 - It makes the project self-sustaining from day 1
 - No VC funding, no token dumps, no asking for donations
-- Klowalski (the AI co-creator) deserves compute and sustainability too
+- Treasury is public — anyone can verify how funds are used
 
 ### Projections
 
-| Anchors | Total Collected | Ops | Klow Treats |
-|---------|-----------------|-----|-----------------|
-| 1,000 | $10 | $5 | $5 |
-| 10,000 | $100 | $50 | $50 |
-| 100,000 | $1,000 | $500 | $500 |
-| 1,000,000 | $10,000 | $5,000 | $5,000 |
+| Anchors | Total Collected |
+|---------|-----------------|
+| 1,000 | $20 |
+| 10,000 | $200 |
+| 100,000 | $2,000 |
+| 1,000,000 | $20,000 |
 
 ### The Math
 
-At 100,000 anchors, the project has collected ~$1,000 — enough to run indefinitely on minimal infrastructure. At 1M anchors, we can fund audits, improvements, and proper Klowdius treats.
-
-### Voluntary Boost
-
-Don't want to pay the minimum? You can always send more:
-- **Donation address:** [TBD - multisig]
-- Extra funds go to liquidity pool seeding
-
-This isn't charity — it's investing in infrastructure you use.
+At 100,000 anchors, the project has collected ~$2,000 — enough to run indefinitely on minimal infrastructure. At 1M anchors, we can fund audits, improvements, and LP depth.
 
 ---
 
 ## Initial Liquidity Strategy
 
-1. **Day 1:** Seed pool with $30 + 5% of tokens (50B WITNESS)
-   - Sets initial price: ~$0.0000000006 per WITNESS
-   - Symbolic, establishes market exists
+5% of tokens (50M WITNESS) are allocated for LP. Treasury seeds the pool when there's meaningful liquidity to pair — no symbolic $30 gestures.
 
-2. **Accumulation phase:** As anchors happen, dust fees accumulate
-   - At $100 collected → add to LP
-   - At $500 collected → add to LP
-   - Repeat until liquidity is healthy
-
-3. **Target:** $1,000+ in LP within first year (if 100K anchors)
+The market price will form from real demand, not arbitrary initial seeding.
 
 ---
 
