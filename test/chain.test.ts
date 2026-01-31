@@ -344,6 +344,49 @@ describe('Chain Verification', () => {
     expect(result.errors.some((e) => e.type === 'hash_mismatch')).toBe(true);
   });
 
+  it('should detect content file tampering', async () => {
+    // Read the chain to get the content_hash of an entry
+    const chainPath = join(testDir, 'chain.jsonl');
+    const content = await readFile(chainPath, 'utf-8');
+    const lines = content.trim().split('\n');
+    const entry = JSON.parse(lines[1]); // First entry after genesis
+
+    // Extract the hash hex (remove "sha256:" prefix)
+    const hashHex = entry.content_hash.slice(7);
+    const contentFilePath = join(testDir, 'content', hashHex);
+
+    // Tamper with the content file (replace content with different content)
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(contentFilePath, 'I am FAKE content - tampered!');
+
+    const result = await verifyChain(testDir);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.type === 'content_mismatch')).toBe(true);
+    expect(result.errors.some((e) => e.message.includes('Content tampered'))).toBe(true);
+  });
+
+  it('should not fail for missing content (could be redacted)', async () => {
+    // Read the chain to get the content_hash of an entry
+    const chainPath = join(testDir, 'chain.jsonl');
+    const content = await readFile(chainPath, 'utf-8');
+    const lines = content.trim().split('\n');
+    const entry = JSON.parse(lines[1]); // First entry after genesis
+
+    // Extract the hash hex and delete the content file
+    const hashHex = entry.content_hash.slice(7);
+    const contentFilePath = join(testDir, 'content', hashHex);
+
+    const { unlink } = await import('node:fs/promises');
+    await unlink(contentFilePath);
+
+    // Missing content is allowed (could be intentional redaction)
+    const result = await verifyChain(testDir);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
   it('should provide summary statistics', async () => {
     const result = await verifyChain(testDir);
 

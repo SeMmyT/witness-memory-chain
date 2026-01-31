@@ -21,6 +21,7 @@ import {
   encryptPrivateKey,
   decryptPrivateKey,
 } from './crypto.js';
+import { getContentVerified, ContentIntegrityError } from '../storage/content-store.js';
 import type {
   ChainEntry,
   ChainEntryInput,
@@ -191,10 +192,15 @@ export function setPasswordProvider(provider: PasswordProvider | null): void {
 /**
  * Load private key based on key mode
  * @param dataDir - Chain directory
- * @param keyMode - Key storage mode
+ * @param keyMode - Key storage mode (defaults to config value if not specified)
  * @returns Decrypted private key
  */
-async function loadPrivateKey(dataDir: string, keyMode: KeyMode = 'raw'): Promise<Uint8Array> {
+export async function loadPrivateKey(dataDir: string, keyMode?: KeyMode): Promise<Uint8Array> {
+  // If keyMode not specified, load from config
+  if (!keyMode) {
+    const config = await loadConfig(dataDir);
+    keyMode = config.keyMode;
+  }
   switch (keyMode) {
     case 'raw': {
       const keyPath = join(dataDir, PRIVATE_KEY_FILE);
@@ -611,7 +617,27 @@ export async function verifyChain(dataDir: string): Promise<VerificationResult> 
       });
     }
 
-    // Count redacted entries
+    // Verify content hash matches stored content
+    const contentDir = join(dataDir, CONTENT_DIR);
+    try {
+      await getContentVerified(contentDir, entry.content_hash);
+      // content === null means file is missing (possibly redacted)
+      // We only flag as error if content exists but hash doesn't match
+      // Missing content could be intentional redaction - not an error
+    } catch (err) {
+      if (err instanceof ContentIntegrityError) {
+        // Content exists but hash doesn't match - TAMPERING!
+        errors.push({
+          seq: entry.seq,
+          type: 'content_mismatch',
+          message: `Content tampered for entry ${entry.seq}: expected ${err.expectedHash}, got ${err.actualHash}`,
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    // Count redacted entries (by type marker)
     if (entry.type === 'redaction') {
       redactedCount++;
     }

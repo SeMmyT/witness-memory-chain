@@ -66,7 +66,7 @@ export interface VerificationResult {
 /** A verification error */
 export interface VerificationError {
   seq: number;
-  type: 'hash_mismatch' | 'signature_invalid' | 'sequence_gap' | 'timestamp_invalid';
+  type: 'hash_mismatch' | 'signature_invalid' | 'sequence_gap' | 'timestamp_invalid' | 'content_mismatch';
   message: string;
 }
 
@@ -278,3 +278,22 @@ export interface ContentOptions {
   /** Verify content hash matches stored hash */
   verify?: boolean;
 }
+
+// ============================================================================
+// Base Anchor Types
+// ============================================================================
+
+/** Configuration for Base blockchain anchoring */
+export interface BaseAnchorConfig {
+  /** WitnessRegistry contract address */
+  registryAddress: `0x${string}`;
+  /** WITNESS token address */
+  witnessTokenAddress: `0x${string}`;
+  /** RPC URL for Base */
+  rpcUrl: string;
+  /** Use testnet (Base Sepolia) instead of mainnet */
+  testnet?: boolean;
+}
+
+/** Anchor provider type */
+export type AnchorProviderType = 'opentimestamps' | 'base';

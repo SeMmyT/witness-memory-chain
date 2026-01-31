@@ -2,23 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Package Manager
+
+**Always use pnpm** - do not use npm.
+
 ## Commands
 
 ```bash
-npm run build        # Compile TypeScript to dist/
-npm run lint         # Type-check without emitting (tsc --noEmit)
-npm test             # Run tests in watch mode
-npm run test:run     # Run tests once (CI mode)
+pnpm build           # Compile TypeScript to dist/
+pnpm lint            # Type-check without emitting (tsc --noEmit)
+pnpm test            # Run tests in watch mode
+pnpm test:run        # Run tests once (CI mode)
 ```
 
 Run a single test file:
 ```bash
-npx vitest run test/chain.test.ts
+pnpm vitest run test/chain.test.ts
 ```
 
 Run tests matching a pattern:
 ```bash
-npx vitest run -t "verify chain"
+pnpm vitest run -t "verify chain"
 ```
 
 ## Architecture
