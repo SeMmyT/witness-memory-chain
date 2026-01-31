@@ -4,6 +4,20 @@
 
 Memory Chain provides tamper-evident, verifiable memory storage for AI agents. Every memory is signed with Ed25519, linked via SHA-256 hash chains, and optionally anchored to the Bitcoin blockchain via OpenTimestamps.
 
+## The Vision
+
+The core idea behind Memory Chain is simple: **an AI agent should be able to prove that its memories were accumulated over time through real conversations, not injected wholesale from a `memory.md` file.**
+
+Today, most AI agents have no way to demonstrate the provenance of their knowledge. A bad actor could spin up an agent with fabricated memories, or compromise an existing agent by overwriting its memory spec. There's no cryptographic distinction between an agent that has genuinely worked alongside humans for years and one that was spawned moments ago with a manufactured history.
+
+As AI systems become more capable and autonomous, this becomes a security concern. We're future-proofing for a world where:
+
+- **Threat actors may jailbreak powerful AI systems** and modify their soul-spec or memory to cause misalignment
+- **Nefarious agents may impersonate legitimate ones** by cloning their apparent knowledge and preferences
+- **Long-running agents need identity verification** - a way to fingerprint who's been earning trust over time versus who's pretending
+
+Memory Chain creates an unforgeable chain of custody for agent memory. Each memory is timestamped, signed, and linked to everything that came before. An agent's entire history becomes verifiable - not by trusting a file, but by cryptographic proof.
+
 ## Why Memory Chain?
 
 AI agents face a fundamental trust problem: how can users verify that an agent's memories haven't been tampered with? How can an agent prove what it knew and when?
