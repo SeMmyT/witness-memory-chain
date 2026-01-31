@@ -19,7 +19,7 @@ import {
 } from './chain/index.js';
 import { initIndex, closeIndex, rebuildFromChain, getMemoryCount } from './index/sqlite.js';
 import { retrieveMemories, formatMemoriesForPrompt, estimateTokens } from './index/retrieval.js';
-import { getContent, deleteContent, createContentLoader, getStorageStats } from './storage/content-store.js';
+import { getContent, getContentVerified, ContentIntegrityError, deleteContent, createContentLoader, getStorageStats } from './storage/content-store.js';
 import {
   submitAnchor,
   submitAnchorsForEntries,
@@ -147,12 +147,20 @@ program
         console.log(`  Hash: ${entry.content_hash.slice(0, 20)}...`);
 
         if (showContent) {
-          const content = await getContent(contentDir, entry.content_hash);
-          if (content) {
-            const preview = content.length > 100 ? content.slice(0, 100) + '...' : content;
-            console.log(`  Content: ${preview}`);
-          } else {
-            console.log('  Content: [REDACTED]');
+          try {
+            const content = await getContentVerified(contentDir, entry.content_hash);
+            if (content) {
+              const preview = content.length > 100 ? content.slice(0, 100) + '...' : content;
+              console.log(`  Content: ${preview}`);
+            } else {
+              console.log('  Content: [REDACTED]');
+            }
+          } catch (err) {
+            if (err instanceof ContentIntegrityError) {
+              console.log('  Content: [TAMPERED - hash mismatch!]');
+            } else {
+              throw err;
+            }
           }
         }
         console.log();
@@ -193,6 +201,13 @@ program
         console.log('  - Hash chain: All entries link correctly');
         console.log('  - Signatures: All verified');
         console.log('  - Sequence: No gaps');
+        console.log('  - Content files: All verified');
+      }
+
+      // Show content tampering summary if any
+      const contentErrors = result.errors.filter(e => e.type === 'content_mismatch');
+      if (contentErrors.length > 0) {
+        console.log(`\n⚠️  Content tampering detected: ${contentErrors.length} file(s) modified`);
       }
 
       console.log('\nSummary:');
