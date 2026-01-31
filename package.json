@@ -1,5 +1,5 @@
 {
-  "name": "@openclaw/memory-chain",
+  "name": "witness-memory-chain",
   "version": "0.1.0",
   "description": "Cryptographic proof of experience for AI agents with efficient retrieval",
   "type": "module",

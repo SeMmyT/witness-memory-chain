@@ -129,7 +129,7 @@ Content-addressable storage enables efficient and flexible content handling:
 ## Installation
 
 ```bash
-npm install @openclaw/memory-chain
+npm install witness-memory-chain
 ```
 
 Or clone and build:
@@ -180,7 +180,7 @@ import {
   rebuildFromChain,
   readChain,
   createContentLoader,
-} from '@openclaw/memory-chain';
+} from 'witness-memory-chain';
 
 // Initialize a new chain
 await initChain('~/.myagent/memory', { agentName: 'MyAgent' });
@@ -304,7 +304,7 @@ import {
   upgradePendingAnchors,
   verifyAnchor,
   getAnchorStatus,
-} from '@openclaw/memory-chain';
+} from 'witness-memory-chain';
 
 // Submit an entry for timestamping
 const entry = await addEntry(dataDir, { type: 'decision', content: '...' });
@@ -340,7 +340,7 @@ await initChain(dataDir, { keyMode: 'raw' });
 Private key encrypted with password using scrypt + AES-256-GCM:
 
 ```typescript
-import { setPasswordProvider, initChain } from '@openclaw/memory-chain';
+import { setPasswordProvider, initChain } from 'witness-memory-chain';
 
 // Set up password provider
 setPasswordProvider(async () => {
@@ -369,7 +369,7 @@ await initChain(dataDir, { keyMode: 'env' });
 ### Export Chain
 
 ```typescript
-import { exportChain, exportChainToFile } from '@openclaw/memory-chain';
+import { exportChain, exportChainToFile } from 'witness-memory-chain';
 
 // Export to object
 const exported = await exportChain(dataDir, {
@@ -385,7 +385,7 @@ await exportChainToFile(dataDir, 'backup.json', { includeContent: true });
 ### Import Chain
 
 ```typescript
-import { importChain, importChainFromFile } from '@openclaw/memory-chain';
+import { importChain, importChainFromFile } from 'witness-memory-chain';
 
 // Import from file
 const result = await importChainFromFile('backup.json', newDataDir);
