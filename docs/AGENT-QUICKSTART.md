@@ -5,8 +5,8 @@ Get cryptographic memory for your AI agent in 60 seconds.
 ## Setup (30 seconds)
 
 ```bash
-# Install globally
-npm install -g @openclaw/memory-chain
+# Install globally (or add to your project)
+npm install -g witness-memory-chain
 
 # Initialize your chain
 memory-chain init --name "YourAgentName"
