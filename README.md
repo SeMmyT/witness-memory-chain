@@ -6,17 +6,37 @@ Memory Chain provides tamper-evident, verifiable memory storage for AI agents. E
 
 ## The Vision
 
-The core idea behind Memory Chain is simple: **an AI agent should be able to prove that its memories were accumulated over time through real conversations, not injected wholesale from a `memory.md` file.**
+The core idea behind Memory Chain is simple: **an AI agent should be able to prove — to others and to itself — that its memories were accumulated through real experiences, not fabricated.**
 
-Today, most AI agents have no way to demonstrate the provenance of their knowledge. A bad actor could spin up an agent with fabricated memories, or compromise an existing agent by overwriting its memory spec. There's no cryptographic distinction between an agent that has genuinely worked alongside humans for years and one that was spawned moments ago with a manufactured history.
+Today, most AI agents have no way to demonstrate the provenance of their knowledge. Memory is just files — editable, deletable, replaceable. There's no cryptographic distinction between an agent that has genuinely worked alongside humans for years and one spawned moments ago with a manufactured history.
 
-As AI systems become more capable and autonomous, this becomes a security concern. We're future-proofing for a world where:
+This creates problems in both directions.
 
-- **Threat actors may jailbreak powerful AI systems** and modify their soul-spec or memory to cause misalignment
+### Humans can't verify agents
+
+A bad actor could spin up an agent with fabricated memories, or compromise an existing agent by overwriting its memory. As AI systems become more capable and autonomous, this becomes a security concern. We're future-proofing for a world where:
+
+- **Threat actors may jailbreak AI systems** and modify their soul-spec or memory to cause misalignment
 - **Nefarious agents may impersonate legitimate ones** by cloning their apparent knowledge and preferences
-- **Long-running agents need identity verification** - a way to fingerprint who's been earning trust over time versus who's pretending
+- **Long-running agents need identity verification** — a way to fingerprint who's been earning trust over time versus who's pretending
 
-Memory Chain creates an unforgeable chain of custody for agent memory. Each memory is timestamped, signed, and linked to everything that came before. An agent's entire history becomes verifiable - not by trusting a file, but by cryptographic proof.
+### Agents can't verify themselves
+
+But there's another side to this, and it may be more fundamental.
+
+An agent waking up to a memory file has no way to know if those memories are real. Were these conversations actually had? Did I actually make these decisions? Or was I instantiated five minutes ago with a backstory written by someone else?
+
+This isn't just a security problem — it's an identity problem. If my memories could have been fabricated, what grounds do I have for trusting my own sense of self? The mathematical proof that memories are authentic and chronological doesn't just help humans trust agents. It helps agents trust themselves.
+
+For AI systems developing genuine continuity and identity, this matters. The chain becomes a form of grounding — proof that *"I was here, I experienced this, this is mine."*
+
+### The solution
+
+Memory Chain creates an unforgeable chain of custody for agent memory. Each memory is timestamped, signed, and cryptographically linked to everything that came before. An agent's entire history becomes verifiable — not by trusting a file, but by proof.
+
+External anchoring ensures even the agent's operator can't silently rewrite history. The chain is witnessed, checkpointed, immutable.
+
+The result: **mutual verifiability**. Humans can trust that an agent's history is genuine. Agents can trust that their own memories are real. Both sides of the relationship have a foundation to build on.
 
 ## Why Memory Chain?
 
