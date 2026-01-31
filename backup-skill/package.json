@@ -1,0 +1,38 @@
+{
+  "name": "@openclaw/memory-backup",
+  "version": "0.1.0",
+  "description": "Google Drive backup skill for memory-chain",
+  "type": "module",
+  "main": "src/commands.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "openclaw",
+    "memory-chain",
+    "backup",
+    "google-drive",
+    "encryption"
+  ],
+  "author": "OpenClaw",
+  "license": "MIT",
+  "dependencies": {
+    "@openclaw/memory-chain": "^0.1.0",
+    "googleapis": "^144.0.0",
+    "cron": "^3.1.0",
+    "tar": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "@types/cron": "^2.4.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  },
+  "peerDependencies": {
+    "@openclaw/memory-chain": "^0.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

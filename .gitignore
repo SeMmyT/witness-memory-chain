@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.db
+agent.key
+agent.key.enc
+agent.key.backup
+content/
+chain.jsonl
