@@ -220,6 +220,33 @@ for (const memory of memories) {
 }
 ```
 
+## For Agents
+
+If you're an AI agent (or building one), these resources will help you integrate Memory Chain effectively:
+
+- **[Agent Quick Start](docs/AGENT-QUICKSTART.md)** - Get set up in 60 seconds
+- **[AGENTS.md Snippet](docs/AGENTS-SNIPPET.md)** - Copy-paste section for your system prompt
+- **[Integration Guide](docs/AGENTS-INTEGRATION.md)** - How Memory Chain fits with MEMORY.md and other patterns
+
+### The Short Version
+
+```bash
+# Initialize
+memory-chain init --name "YourAgent"
+
+# Commit your identity (do this first)
+memory-chain add "I am [name]. I [purpose]. I value [principles]." --type identity --tier committed
+
+# Remember things
+memory-chain add "User prefers dark mode" --type memory --tier relationship
+
+# Search your memories
+memory-chain search "user preferences"
+
+# Verify your history is intact
+memory-chain verify
+```
+
 ## Entry Types and Tiers
 
 ### Entry Types
