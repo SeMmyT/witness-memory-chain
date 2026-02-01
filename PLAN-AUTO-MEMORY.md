@@ -253,6 +253,210 @@ for (const memory of memories) {
 
 ---
 
+## Answers: Brain-Inspired Solutions
+
+*Research conducted 2026-02-01 ~02:37 UTC, studying human memory consolidation mechanisms.*
+
+### Key Neuroscience Insight: Two-Stage Memory System
+
+The brain solves the "stability-plasticity dilemma" with:
+- **Hippocampus** (fast, temporary): Rapidly encodes new experiences
+- **Neocortex** (slow, permanent): Gradually receives consolidated memories
+- **Sleep**: Offline consolidation via "sharp wave ripples" — compressed replay
+
+**Critical principle:** Encoding and consolidation don't happen simultaneously. The brain dedicates different states (waking vs sleeping) to each.
+
+---
+
+### A1: Accessing Main Session Context
+
+**Brain model:** The neocortex can't directly read hippocampal memories. Instead, the hippocampus **replays** compressed summaries during sleep via sharp wave ripple bursts.
+
+**Solution: Session Buffer Export**
+
+```
+Main Session (hippocampus)     Isolated Job (neocortex)
+         │                              │
+         ▼                              │
+  [Periodic export]                     │
+         │                              │
+         ▼                              ▼
+  session-buffer.md  ───────────▶  Read buffer
+  (curated digest)                 (not session)
+```
+
+- Main session (or heartbeat) writes periodic digest to `~/.openclaw/workspace/session-buffer.md`
+- Isolated cron reads ONLY this buffer, never the session directly
+- Main session controls what gets exported (importance filtering happens at source)
+- Clear separation: encoder writes, consolidator reads
+
+**Alternative:** Use `sessions_history` API — but this breaks the isolation model. Buffer approach is cleaner.
+
+---
+
+### A2: GC and Chain Preservation
+
+**Brain model:** The brain doesn't delete engrams (memory traces) — it weakens access paths. Physical substrate persists longer than functional access.
+
+**Solution: Index removal, chain preservation**
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│   memory.db     │     │   chain.jsonl   │
+│   (SQLite)      │     │   (append-only) │
+│                 │     │                 │
+│   ┌─────────┐   │     │   Entry 1       │
+│   │ Active  │◀──┼─────│   Entry 2       │
+│   │ entries │   │     │   Entry 3 ←(GC) │
+│   └─────────┘   │     │   Entry 4       │
+│   ┌─────────┐   │     │   ...           │
+│   │Archived │   │     │                 │
+│   │ (hidden)│   │     │   (immutable)   │
+│   └─────────┘   │     │                 │
+└─────────────────┘     └─────────────────┘
+```
+
+- **chain.jsonl:** NEVER delete. Cryptographic integrity requires immutability.
+- **memory.db index:** Mark entries as `archived` or remove from active queries
+- **Result:** You lose easy recall (index removal) but history is provable (chain intact)
+
+GC = **relevance filtering**, not deletion. The chain is permanent record; index is working memory.
+
+---
+
+### A3: Capture Frequency Balance
+
+**Brain model:** Consolidation isn't continuous — it occurs in discrete sleep cycles (~90 min), with sharp wave ripples concentrated in early sleep.
+
+**Solution: Event-driven + batched consolidation**
+
+Instead of fixed 30-min intervals, consider:
+
+| Trigger | Action | Cost |
+|---------|--------|------|
+| Session end/reset | Full consolidation pass | Medium |
+| "Remember this" detected | Immediate commit | Low |
+| High-significance event | Flag + quick note | Low |
+| Every 2-4 hours | Batch summary of flagged items | Medium |
+| Daily (night) | Major consolidation, MEMORY.md update | Higher |
+
+**Key insight:** Importance-weighted, not volume-based. The brain consolidates what matters, not everything.
+
+**Proposed rhythm:**
+- Lightweight: Heartbeat checks for significance flags (cheap)
+- Medium: 2-4 hour batch summaries (when significant content exists)
+- Heavy: Daily curation to MEMORY.md (once per day during "sleep")
+
+---
+
+### A4: Handling Conflicts
+
+**Brain model:** The amygdala tags emotionally significant events for priority consolidation. Attention during encoding also increases consolidation priority.
+
+**Solution: Manual commits = priority flag**
+
+```
+Priority hierarchy:
+1. Manual commits (explicit "remember this")  ← HIGHEST
+2. Detected high-significance (decisions, identity)
+3. Auto-captured content  ← LOWEST
+```
+
+**Conflict resolution:**
+1. Before auto-capture, check for existing manual commits covering same content
+2. Tag all entries with `source: auto` vs `source: manual`
+3. During curation, manual sources override/supersede auto
+4. Track "last captured" pointer to avoid reprocessing
+
+**Dedup logic:**
+```javascript
+// Before auto-commit:
+const existing = await searchChain(contentHash);
+const inMemoryFile = await checkDailyFile(date, contentSummary);
+const inMemoryMd = await checkMemoryMd(contentSummary);
+
+if (existing || inMemoryFile || inMemoryMd) {
+  skip(); // Already captured
+} else {
+  commit({ source: 'auto', ...content });
+}
+```
+
+---
+
+## Architecture Diagram (Brain-Inspired)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    WAKING STATE (Main Session)                   │
+│                                                                  │
+│   ┌──────────┐      ┌────────────────┐      ┌────────────────┐  │
+│   │ Encoding │ ───▶ │  Working Mem   │ ───▶ │ Session Buffer │  │
+│   │ (input)  │      │  (context)     │      │ (export file)  │  │
+│   └──────────┘      └────────────────┘      └───────┬────────┘  │
+│                              │                      │           │
+│                    ┌─────────┴──────────┐           │           │
+│                    │ Manual "remember"  │           │           │
+│                    │ → Direct to chain  │           │           │
+│                    └────────────────────┘           │           │
+└─────────────────────────────────────────────────────┼───────────┘
+                                                      │
+                      ┌───────────────────────────────┘
+                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SLEEP STATE (Isolated Crons)                  │
+│                                                                  │
+│   ┌──────────┐      ┌────────────────┐      ┌────────────────┐  │
+│   │  Read    │ ───▶ │  Summarize +   │ ───▶ │ memory/*.md    │  │
+│   │  Buffer  │      │  Dedup         │      │ (daily notes)  │  │
+│   └──────────┘      └────────────────┘      └───────┬────────┘  │
+│                                                     │           │
+│                      ┌──────────────────────────────┘           │
+│                      ▼                                          │
+│   ┌──────────┐      ┌────────────────┐      ┌────────────────┐  │
+│   │ Weekly   │ ◀─── │    Curate      │ ◀─── │ Read dailies   │  │
+│   │MEMORY.md │      │ (distill)      │      │                │  │
+│   └──────────┘      └───────┬────────┘      └────────────────┘  │
+│                             │                                   │
+│                             ▼                                   │
+│                    ┌────────────────┐      ┌────────────────┐  │
+│                    │  Commit sig.   │ ───▶ │ Memory Chain   │  │
+│                    │  to chain      │      │ (permanent)    │  │
+│                    └────────────────┘      └────────────────┘  │
+│                                                                 │
+│   ┌────────────────────────────────────────────────────────┐   │
+│   │  GC: Remove from index, preserve chain.jsonl            │   │
+│   │      (lose access path, keep provable history)          │   │
+│   └────────────────────────────────────────────────────────┘   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Updated Implementation Order
+
+1. [x] **Phase 0: Research** ← DONE (brain mechanics analysis)
+2. [ ] **Phase 1: Session Buffer**
+   - Add buffer export to heartbeat or session hooks
+   - Define buffer format (JSON? MD?)
+   - Test export → read cycle
+3. [ ] **Phase 2: Cron Jobs (revised)**
+   - Read buffer, not session
+   - Implement dedup logic
+   - Add source tagging
+4. [ ] **Phase 3: Curation Logic**
+   - Priority hierarchy for sources
+   - MEMORY.md update format
+5. [ ] **Phase 4: GC**
+   - Index archival (not deletion)
+   - Chain preservation always
+6. [ ] **Phase 5: Bootstrap**
+   - Token-budgeted retrieval
+   - Importance-weighted injection
+
+---
+
 ## Reference
 
 This plan emerged from a conversation about @jumperz's checkpoint approach on Twitter, combined with our existing Memory Chain infrastructure. The goal is to make memory "just work" without manual intervention while preserving cryptographic proof for things that matter.
