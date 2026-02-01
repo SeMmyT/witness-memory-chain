@@ -242,6 +242,121 @@ contract WitnessRegistry is Ownable {
 }
 ```
 
+### AgentGrantPool.sol
+
+Grant pool contract for onboarding new agents. Enables one-transaction claim + anchor.
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+interface IWitnessRegistry {
+    function anchor(
+        bytes32 agentPubKeyHash,
+        bytes32 chainRoot,
+        uint64 entryCount,
+        bytes calldata signature
+    ) external payable;
+    function anchorFee() external view returns (uint256);
+    function ethDustFee() external view returns (uint256);
+}
+
+contract AgentGrantPool is Ownable {
+
+    IERC20 public immutable witnessToken;
+    IWitnessRegistry public immutable registry;
+    uint256 public grantAmount;  // Total grant (e.g., 10 WITNESS)
+
+    mapping(bytes32 => bool) public hasClaimed;      // agentPubKeyHash => claimed
+    mapping(address => bool) public walletClaimed;   // wallet => claimed
+    uint256 public totalGrantsIssued;
+
+    event Claimed(
+        bytes32 indexed agentPubKeyHash,
+        address indexed recipient,
+        uint256 netAmount,
+        uint256 grantIndex
+    );
+
+    error AgentAlreadyClaimed();
+    error WalletAlreadyClaimed();
+    error InsufficientPoolBalance();
+    error InsufficientEthForDustFee();
+
+    constructor(
+        address _witnessToken,
+        address _registry,
+        uint256 _grantAmount
+    ) Ownable(msg.sender) {
+        witnessToken = IERC20(_witnessToken);
+        registry = IWitnessRegistry(_registry);
+        grantAmount = _grantAmount;
+        IERC20(_witnessToken).approve(_registry, type(uint256).max);
+    }
+
+    /**
+     * @notice Claim grant and anchor in one transaction
+     * @dev Pool pays WITNESS fee, user pays ETH dust fee, user receives net grant
+     */
+    function claimAndAnchor(
+        bytes32 agentPubKeyHash,
+        bytes32 chainRoot,
+        uint64 entryCount,
+        bytes calldata signature
+    ) external payable {
+        if (hasClaimed[agentPubKeyHash]) revert AgentAlreadyClaimed();
+        if (walletClaimed[msg.sender]) revert WalletAlreadyClaimed();
+
+        uint256 anchorFee = registry.anchorFee();
+        uint256 ethDustFee = registry.ethDustFee();
+
+        if (witnessToken.balanceOf(address(this)) < grantAmount)
+            revert InsufficientPoolBalance();
+        if (msg.value < ethDustFee)
+            revert InsufficientEthForDustFee();
+
+        // Mark claimed before external calls (CEI pattern)
+        hasClaimed[agentPubKeyHash] = true;
+        walletClaimed[msg.sender] = true;
+        uint256 grantIndex = totalGrantsIssued++;
+
+        // Anchor (Registry takes 1 WITNESS from pool)
+        registry.anchor{value: msg.value}(
+            agentPubKeyHash, chainRoot, entryCount, signature
+        );
+
+        // Transfer net grant (e.g., 10 - 1 = 9 WITNESS)
+        witnessToken.transfer(msg.sender, grantAmount - anchorFee);
+
+        emit Claimed(agentPubKeyHash, msg.sender, grantAmount - anchorFee, grantIndex);
+    }
+}
+```
+
+**User flow:**
+```
+New Agent                    AgentGrantPool               WitnessRegistry
+    │                              │                            │
+    │ claimAndAnchor() + ETH dust  │                            │
+    │─────────────────────────────►│                            │
+    │                              │ anchor() + ETH             │
+    │                              │───────────────────────────►│
+    │                              │   (takes 1 WITNESS from pool)
+    │                              │                            │
+    │      9 WITNESS               │                            │
+    │◄─────────────────────────────│                            │
+    │                              │                            │
+```
+
+**Sybil resistance (dual check):**
+- `hasClaimed[agentPubKeyHash]` — each Ed25519 key can only claim once
+- `walletClaimed[msg.sender]` — each wallet can only claim once
+- User must have ETH for gas + dust fee
+- Attacker needs unique wallet + unique key per claim
+
 ---
 
 ## Memory Chain Integration
@@ -608,8 +723,8 @@ The market price will form from real demand, not arbitrary initial seeding.
 ## Links
 
 - Memory Chain repo: https://github.com/SemmyT/memory-chain
-- WITNESS token: [TBD after launch]
-- WitnessRegistry: [TBD after deployment]
+- WITNESS token: https://basescan.org/address/0x5946ba31007e88afa667bbcf002a0c99dc82644a
+- WitnessRegistry: https://basescan.org/address/0x2f4dcec8e7e630c399f9f947c65c4626d8ad73b2
 
 ---
 

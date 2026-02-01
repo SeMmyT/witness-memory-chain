@@ -363,8 +363,8 @@ import {
 
 // Anchor to Base (requires wallet with WITNESS tokens + ETH)
 const receipt = await anchorToBase(dataDir, {
-  registryAddress: '0x...',
-  witnessTokenAddress: '0x...',
+  registryAddress: '0x2f4dcec8e7e630c399f9f947c65c4626d8ad73b2',
+  witnessTokenAddress: '0x5946ba31007e88afa667bbcf002a0c99dc82644a',
   rpcUrl: 'https://mainnet.base.org',
 }, walletPrivateKey);
 
