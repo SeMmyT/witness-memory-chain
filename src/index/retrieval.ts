@@ -17,6 +17,7 @@ import type {
   FtsSearchResult,
   EntryType,
   Tier,
+  DecayTier,
 } from '../types.js';
 import { DEFAULT_SCORING_WEIGHTS } from '../types.js';
 import { updateAccessCount } from './sqlite.js';
@@ -258,6 +259,27 @@ function normalizeAccessCount(count: number, maxCount: number): number {
 }
 
 /**
+ * Get decay weight for a decay tier
+ *
+ * Hot memories get full weight, warm get reduced weight,
+ * cold get further reduced, and archived get zero.
+ */
+function getDecayWeight(tier: DecayTier | undefined): number {
+  switch (tier) {
+    case 'hot':
+      return 1.0;
+    case 'warm':
+      return 0.7;
+    case 'cold':
+      return 0.4;
+    case 'archived':
+      return 0; // Archived should not appear in results
+    default:
+      return 1.0; // Default to hot if tier not set
+  }
+}
+
+/**
  * Merge and score results from multiple sources
  */
 function mergeAndScore(
@@ -308,11 +330,15 @@ function mergeAndScore(
     const importanceScore = memory.importance;
     const accessScore = normalizeAccessCount(memory.access_count, maxAccess);
 
-    const combinedScore =
+    const baseScore =
       weights.fts * ftsScore +
       weights.recency * recencyScore +
       weights.importance * importanceScore +
       weights.access * accessScore;
+
+    // Apply decay weight based on memory tier
+    const decayWeight = getDecayWeight(memory.decay_tier);
+    const combinedScore = baseScore * decayWeight;
 
     scoredMemories.push({
       ...memory,
@@ -479,10 +505,14 @@ export function retrieveContext(
     const importanceScore = memory.importance;
     const accessScore = normalizeAccessCount(memory.access_count, maxAccess);
 
-    const combinedScore =
+    const baseScore =
       weights.recency * recencyScore +
       weights.importance * importanceScore +
       weights.access * accessScore;
+
+    // Apply decay weight based on memory tier
+    const decayWeight = getDecayWeight(memory.decay_tier);
+    const combinedScore = baseScore * decayWeight;
 
     scored.push({
       ...memory,

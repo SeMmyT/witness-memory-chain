@@ -30,6 +30,8 @@
 export type {
   EntryType,
   Tier,
+  MemorySource,
+  DecayTier,
   KeyMode,
   ChainEntry,
   ChainEntryInput,
@@ -224,3 +226,18 @@ export type {
   ProviderVerifyOptions,
   AnchorProvider,
 } from './anchor/provider.js';
+
+// Index operations - Decay tier support
+export {
+  updateDecayTier,
+  getMemoriesByDecayTier,
+  getGCCandidates,
+  archiveMemory,
+  updateAllDecayTiers,
+  getMemoriesBySource,
+} from './index/sqlite.js';
+
+export type { InsertMemoryInput } from './index/sqlite.js';
+
+// Auto-Memory Cron Module
+export * as cron from './cron/index.js';
