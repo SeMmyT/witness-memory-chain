@@ -258,44 +258,6 @@ export function compressText(text: string, options: CompressionOptions = {}): st
   return result;
 }
 
-/**
- * Estimate compression ratio
- *
- * @param original - Original text
- * @param compressed - Compressed text
- * @returns Compression ratio (1 = no compression, 0.5 = 50% reduction)
- */
-export function compressionRatio(original: string, compressed: string): number {
-  if (original.length === 0) return 1;
-  return compressed.length / original.length;
-}
-
-// ============================================================================
-// Batch Compression
-// ============================================================================
-
-/**
- * Compress multiple texts with consistent entity handling
- *
- * @param texts - Array of texts to compress
- * @param options - Compression options
- * @returns Array of compressed texts
- */
-export function compressTexts(
-  texts: string[],
-  options: CompressionOptions = {}
-): string[] {
-  // Extract entities from all texts for consistent handling
-  const allEntities = new Set<string>();
-  for (const text of texts) {
-    for (const entity of extractEntities(text)) {
-      allEntities.add(entity);
-    }
-  }
-
-  return texts.map((text) => compressText(text, options));
-}
-
 // ============================================================================
 // Memory Summary Generation
 // ============================================================================

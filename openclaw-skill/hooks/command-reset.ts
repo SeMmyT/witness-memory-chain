@@ -10,8 +10,8 @@ import { homedir } from 'node:os';
 import {
   addEntry,
   readChain,
-} from '@openclaw/memory-chain';
-import type { ChainEntryInput, EntryType, Tier } from '@openclaw/memory-chain';
+} from '@witness/memory-chain';
+import type { ChainEntryInput, EntryType, Tier } from '@witness/memory-chain';
 
 /** Configuration for the auto-commit hook */
 export interface ResetConfig {

@@ -22,8 +22,8 @@ import { sign } from '@noble/ed25519';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hashEntry } from '../chain/crypto.js';
-import { readChain, loadConfig, loadPrivateKey } from '../chain/index.js';
-import type { ChainEntry, ChainConfig } from '../types.js';
+import { readChain, loadPrivateKey } from '../chain/index.js';
+import type { ChainEntry } from '../types.js';
 import type {
   AnchorProvider,
   AnchorProviderType,
@@ -325,8 +325,7 @@ function computeChainRoot(entries: ChainEntry[]): `0x${string}` {
  * Compute the agent public key hash for the registry
  */
 async function computeAgentPubKeyHash(dataDir: string): Promise<`0x${string}`> {
-  const config = await loadConfig(dataDir);
-  const keyPath = join(dataDir, 'keys', 'public.key');
+  const keyPath = join(dataDir, 'agent.pub');
   const pubKeyHex = await readFile(keyPath, 'utf-8');
   return keccak256(toBytes(`0x${pubKeyHex.trim()}`));
 }
@@ -355,6 +354,27 @@ function encodeAnchorData(
   view.setBigUint64(40, BigInt(chainId), false);
 
   return arr;
+}
+
+/**
+ * Sign anchor data with agent's Ed25519 key
+ * Isolated function to minimize key exposure time
+ */
+async function signAnchorData(
+  dataDir: string,
+  chainRoot: `0x${string}`,
+  entryCount: number,
+  chainId: number
+): Promise<`0x${string}`> {
+  const privateKey = await loadPrivateKey(dataDir);
+  try {
+    const anchorData = encodeAnchorData(chainRoot, entryCount, chainId);
+    const signature = await sign(anchorData, privateKey);
+    return `0x${toHex(signature).slice(2)}` as `0x${string}`;
+  } finally {
+    // Clear private key from memory
+    privateKey.fill(0);
+  }
 }
 
 /**
@@ -389,13 +409,8 @@ export async function anchorToBase(
   const entryCount = entries.length;
   const agentPubKeyHash = await computeAgentPubKeyHash(dataDir);
 
-  // Load agent's Ed25519 private key for signing
-  const agentPrivateKey = await loadPrivateKey(dataDir);
-
-  // Sign anchor data
-  const anchorData = encodeAnchorData(chainRoot, entryCount, chain.id);
-  const signature = await sign(anchorData, agentPrivateKey);
-  const signatureHex = `0x${toHex(signature).slice(2)}` as `0x${string}`;
+  // Sign anchor data (key loaded and cleared in isolated function)
+  const signatureHex = await signAnchorData(dataDir, chainRoot, entryCount, chain.id);
 
   // Get fees from contract
   const [witnessFee, ethDustFee] = await Promise.all([
@@ -609,31 +624,6 @@ export async function getAnchorFee(
   ]);
 
   const formatted = (Number(fee) / 10 ** decimals).toFixed(4);
-
-  return { fee, formatted };
-}
-
-/**
- * Get current ETH dust fee
- */
-export async function getEthDustFee(
-  config: BaseAnchorConfig
-): Promise<{ fee: bigint; formatted: string }> {
-  const chain = config.testnet ? baseSepolia : base;
-
-  const publicClient = createPublicClient({
-    chain,
-    transport: http(config.rpcUrl),
-  });
-
-  const fee = await publicClient.readContract({
-    address: config.registryAddress,
-    abi: REGISTRY_ABI,
-    functionName: 'ethDustFee',
-  });
-
-  // Format in ETH (18 decimals)
-  const formatted = (Number(fee) / 1e18).toFixed(6);
 
   return { fee, formatted };
 }

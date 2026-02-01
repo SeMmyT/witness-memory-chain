@@ -4,10 +4,10 @@ Cryptographic proof-of-experience for AI agents running through OpenClaw gateway
 
 ## Installation
 
-The skill is installed as part of the `@openclaw/memory-chain` package:
+The skill is installed as part of the `@witness/memory-chain` package:
 
 ```bash
-npm install @openclaw/memory-chain
+npm install @witness/memory-chain
 ```
 
 Then enable it in your OpenClaw configuration.
@@ -133,7 +133,7 @@ Memories are stored locally at `~/.openclaw/memory-chain/`:
           │                  │                  │
           ▼                  ▼                  ▼
      ┌────────────────────────────────────────────────┐
-     │            @openclaw/memory-chain              │
+     │            @witness/memory-chain              │
      │                                                 │
      │  ┌─────────┐  ┌─────────┐  ┌─────────────────┐ │
      │  │  Chain  │  │  Index  │  │ OpenTimestamps  │ │

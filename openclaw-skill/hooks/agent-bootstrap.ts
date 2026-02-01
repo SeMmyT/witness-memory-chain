@@ -12,19 +12,19 @@ import {
   closeIndex,
   getMemoryCount,
   rebuildFromChain,
-} from '@openclaw/memory-chain';
+} from '@witness/memory-chain';
 import {
   readChain,
   loadConfig,
-} from '@openclaw/memory-chain';
+} from '@witness/memory-chain';
 import {
   createContentLoader,
-} from '@openclaw/memory-chain';
+} from '@witness/memory-chain';
 import {
   retrieveMemories,
   retrieveContext,
   formatMemoriesForPrompt,
-} from '@openclaw/memory-chain';
+} from '@witness/memory-chain';
 
 /** Configuration for the memory injection hook */
 export interface BootstrapConfig {
