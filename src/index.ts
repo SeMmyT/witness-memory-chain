@@ -1,5 +1,5 @@
 /**
- * @openclaw/memory-chain
+ * witness-memory-chain
  *
  * Cryptographic proof of experience for AI agents with efficient retrieval.
  *
@@ -69,7 +69,7 @@ export {
   setPasswordProvider,
 } from './chain/index.js';
 
-export type { InitChainOptions, PasswordProvider } from './chain/index.js';
+export type { InitChainOptions, PasswordProvider, LoadPrivateKeyOptions } from './chain/index.js';
 
 // Export/Import operations
 export {
@@ -145,11 +145,9 @@ export {
 // Compression/Summarization
 export {
   compressText,
-  compressTexts,
   generateMemorySummary,
   extractEntities,
   findPronounReferents,
-  compressionRatio,
 } from './compression.js';
 
 // Metrics/Telemetry

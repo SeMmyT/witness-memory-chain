@@ -70,120 +70,52 @@ CREATE TABLE IF NOT EXISTS meta (
 `;
 
 // ============================================================================
-// Database Registry for Graceful Shutdown
-// ============================================================================
-
-/** Registry of open database connections for graceful shutdown */
-const openDatabases = new Set<Database.Database>();
-
-/** Whether shutdown handlers have been registered */
-let shutdownHandlersRegistered = false;
-
-/**
- * Register shutdown handlers to close all open databases
- */
-function registerShutdownHandlers(): void {
-  if (shutdownHandlersRegistered) return;
-
-  const cleanup = () => {
-    for (const db of openDatabases) {
-      try {
-        if (db.open) {
-          db.close();
-        }
-      } catch {
-        // Ignore errors during shutdown
-      }
-    }
-    openDatabases.clear();
-  };
-
-  // Handle various termination signals
-  process.on('exit', cleanup);
-  process.on('SIGINT', () => {
-    cleanup();
-    process.exit(0);
-  });
-  process.on('SIGTERM', () => {
-    cleanup();
-    process.exit(0);
-  });
-  process.on('uncaughtException', (err) => {
-    console.error('Uncaught exception:', err);
-    cleanup();
-    process.exit(1);
-  });
-
-  shutdownHandlersRegistered = true;
-}
-
-/**
- * Get the count of open databases (for testing/monitoring)
- */
-export function getOpenDatabaseCount(): number {
-  return openDatabases.size;
-}
-
-/**
- * Manually close all open databases
- * Useful for testing or manual cleanup
- */
-export function closeAllDatabases(): void {
-  for (const db of openDatabases) {
-    try {
-      if (db.open) {
-        db.close();
-      }
-    } catch {
-      // Ignore errors
-    }
-  }
-  openDatabases.clear();
-}
-
-// ============================================================================
 // Database Initialization
 // ============================================================================
 
 /**
+ * @deprecated Use getOpenDatabaseCount() is no longer needed - SQLite WAL handles cleanup
+ */
+export function getOpenDatabaseCount(): number {
+  return 0;
+}
+
+/**
+ * @deprecated closeAllDatabases() is no longer needed - SQLite WAL handles cleanup
+ */
+export function closeAllDatabases(): void {
+  // No-op - kept for backward compatibility
+}
+
+/**
  * Initialize or open the SQLite index database
  *
- * The database will be automatically registered for graceful shutdown.
+ * SQLite WAL mode handles crashes gracefully, so explicit shutdown
+ * handlers are not required.
  *
  * @param dbPath - Path to the SQLite database file
- * @param options - Options for database initialization
+ * @param options - Options for database initialization (deprecated, kept for compatibility)
  * @returns Database instance
  */
 export function initIndex(
   dbPath: string,
-  options: { registerForShutdown?: boolean } = {}
+  _options: { registerForShutdown?: boolean } = {}
 ): Database.Database {
-  const { registerForShutdown = true } = options;
-
   const db = new Database(dbPath);
 
-  // Enable WAL mode for better concurrent access
+  // Enable WAL mode for better concurrent access and crash recovery
   db.pragma('journal_mode = WAL');
 
   // Execute schema
   db.exec(SCHEMA);
-
-  // Register for graceful shutdown
-  if (registerForShutdown) {
-    openDatabases.add(db);
-    registerShutdownHandlers();
-  }
 
   return db;
 }
 
 /**
  * Close the database connection
- *
- * This also removes the database from the shutdown registry.
  */
 export function closeIndex(db: Database.Database): void {
-  openDatabases.delete(db);
   if (db.open) {
     db.close();
   }
@@ -268,6 +200,9 @@ export function deleteMemory(db: Database.Database, seq: number): void {
 /**
  * Rebuild the entire index from chain entries
  *
+ * Uses a transaction for atomicity - if the process crashes mid-rebuild,
+ * the index will be unchanged (not left in a partial state).
+ *
  * @param db - Database instance
  * @param entries - Chain entries to index
  * @param contentLoader - Function to load content by hash
@@ -277,9 +212,6 @@ export async function rebuildFromChain(
   entries: ChainEntry[],
   contentLoader: (hash: string) => Promise<string | null>
 ): Promise<{ indexed: number; skipped: number }> {
-  // Clear existing data
-  db.exec('DELETE FROM memories');
-
   // Track redacted entries
   const redactedSeqs = new Set<number>();
 
@@ -290,37 +222,53 @@ export async function rebuildFromChain(
     }
   }
 
-  // Second pass: insert non-redacted entries
+  // Preload all content (async) before starting synchronous transaction
+  const contentMap = new Map<string, string | null>();
+  for (const entry of entries) {
+    if (entry.type !== 'redaction' && !redactedSeqs.has(entry.seq)) {
+      if (!contentMap.has(entry.content_hash)) {
+        contentMap.set(entry.content_hash, await contentLoader(entry.content_hash));
+      }
+    }
+  }
+
+  // Synchronous transaction for atomicity
+  let indexed = 0;
+  let skipped = 0;
+
   const insertStmt = db.prepare(`
     INSERT INTO memories (seq, content, summary, type, tier, importance, access_count, last_accessed, created_at)
     VALUES (?, ?, NULL, ?, ?, 0.5, 0, NULL, ?)
   `);
-
-  let indexed = 0;
-  let skipped = 0;
-
-  // Note: better-sqlite3 transactions are synchronous, so we handle async content loading
-  // by iterating and loading content before inserting each entry
-  for (const entry of entries) {
-    if (entry.type === 'redaction' || redactedSeqs.has(entry.seq)) {
-      skipped++;
-      continue;
-    }
-
-    const content = await contentLoader(entry.content_hash);
-    if (!content) {
-      skipped++;
-      continue;
-    }
-
-    insertStmt.run(entry.seq, content, entry.type, entry.tier, entry.ts);
-    indexed++;
-  }
-
-  // Update rebuild timestamp
   const metaStmt = db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)');
-  metaStmt.run('last_rebuild', new Date().toISOString());
-  metaStmt.run('entries_indexed', indexed.toString());
+
+  const rebuildTransaction = db.transaction(() => {
+    // Clear existing data
+    db.exec('DELETE FROM memories');
+
+    // Insert non-redacted entries
+    for (const entry of entries) {
+      if (entry.type === 'redaction' || redactedSeqs.has(entry.seq)) {
+        skipped++;
+        continue;
+      }
+
+      const content = contentMap.get(entry.content_hash);
+      if (!content) {
+        skipped++;
+        continue;
+      }
+
+      insertStmt.run(entry.seq, content, entry.type, entry.tier, entry.ts);
+      indexed++;
+    }
+
+    // Update rebuild timestamp
+    metaStmt.run('last_rebuild', new Date().toISOString());
+    metaStmt.run('entries_indexed', indexed.toString());
+  });
+
+  rebuildTransaction();
 
   return { indexed, skipped };
 }

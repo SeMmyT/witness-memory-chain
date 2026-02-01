@@ -178,29 +178,58 @@ async function fileExists(path: string): Promise<boolean> {
 /** Password provider function type */
 export type PasswordProvider = () => Promise<string>;
 
-/** Global password provider for encrypted keys */
+/** @deprecated Use passwordProvider parameter instead */
 let globalPasswordProvider: PasswordProvider | null = null;
 
 /**
  * Set the global password provider for encrypted key operations
+ * @deprecated Pass passwordProvider directly to loadPrivateKey() instead
  * @param provider - Async function that returns the password
  */
 export function setPasswordProvider(provider: PasswordProvider | null): void {
   globalPasswordProvider = provider;
 }
 
+/** Options for loading private key */
+export interface LoadPrivateKeyOptions {
+  /** Key storage mode (defaults to config value) */
+  keyMode?: KeyMode;
+  /** Password provider for encrypted keys (falls back to global if not provided) */
+  passwordProvider?: PasswordProvider;
+}
+
 /**
  * Load private key based on key mode
  * @param dataDir - Chain directory
- * @param keyMode - Key storage mode (defaults to config value if not specified)
+ * @param options - Key mode and password provider options
  * @returns Decrypted private key
  */
-export async function loadPrivateKey(dataDir: string, keyMode?: KeyMode): Promise<Uint8Array> {
+export async function loadPrivateKey(
+  dataDir: string,
+  options?: KeyMode | LoadPrivateKeyOptions
+): Promise<Uint8Array> {
+  // Handle both old signature (keyMode?: KeyMode) and new signature (options?: LoadPrivateKeyOptions)
+  let keyMode: KeyMode | undefined;
+  let passwordProvider: PasswordProvider | undefined;
+
+  if (typeof options === 'string') {
+    // Old API: loadPrivateKey(dataDir, keyMode)
+    keyMode = options;
+  } else if (options) {
+    // New API: loadPrivateKey(dataDir, { keyMode, passwordProvider })
+    keyMode = options.keyMode;
+    passwordProvider = options.passwordProvider;
+  }
+
   // If keyMode not specified, load from config
   if (!keyMode) {
     const config = await loadConfig(dataDir);
     keyMode = config.keyMode;
   }
+
+  // Use provided passwordProvider, fall back to global
+  const effectivePasswordProvider = passwordProvider ?? globalPasswordProvider;
+
   switch (keyMode) {
     case 'raw': {
       const keyPath = join(dataDir, PRIVATE_KEY_FILE);
@@ -209,13 +238,13 @@ export async function loadPrivateKey(dataDir: string, keyMode?: KeyMode): Promis
     }
 
     case 'encrypted': {
-      if (!globalPasswordProvider) {
-        throw new Error('No password provider set. Call setPasswordProvider() before using encrypted keys.');
+      if (!effectivePasswordProvider) {
+        throw new Error('No password provider set. Pass passwordProvider option or call setPasswordProvider().');
       }
       const encKeyPath = join(dataDir, PRIVATE_KEY_ENCRYPTED_FILE);
       const encKeyJson = await readFile(encKeyPath, 'utf-8');
       const encryptedKey = JSON.parse(encKeyJson) as EncryptedKeyFile;
-      const password = await globalPasswordProvider();
+      const password = await effectivePasswordProvider();
       return decryptPrivateKey(encryptedKey, password);
     }
 
@@ -249,17 +278,27 @@ async function loadPublicKey(dataDir: string): Promise<Uint8Array> {
  * @param keyMode - Storage mode for private key
  * @param encryptionOptions - Options for encrypted mode
  */
+/** Options for saving key pair */
+interface SaveKeyPairOptions {
+  keyMode?: KeyMode;
+  encryptionOptions?: EncryptionOptions;
+  passwordProvider?: PasswordProvider;
+}
+
 async function saveKeyPair(
   dataDir: string,
   privateKey: Uint8Array,
   publicKey: Uint8Array,
-  keyMode: KeyMode = 'raw',
-  encryptionOptions?: EncryptionOptions
+  options: SaveKeyPairOptions = {}
 ): Promise<void> {
+  const { keyMode = 'raw', encryptionOptions, passwordProvider } = options;
   const publicKeyPath = join(dataDir, PUBLIC_KEY_FILE);
 
   // Always save public key
   await writeFile(publicKeyPath, keyToHex(publicKey), { mode: 0o644 });
+
+  // Use provided passwordProvider, fall back to global
+  const effectivePasswordProvider = passwordProvider ?? globalPasswordProvider;
 
   switch (keyMode) {
     case 'raw': {
@@ -269,10 +308,10 @@ async function saveKeyPair(
     }
 
     case 'encrypted': {
-      if (!globalPasswordProvider) {
-        throw new Error('No password provider set. Call setPasswordProvider() before using encrypted keys.');
+      if (!effectivePasswordProvider) {
+        throw new Error('No password provider set. Pass passwordProvider option or call setPasswordProvider().');
       }
-      const password = await globalPasswordProvider();
+      const password = await effectivePasswordProvider();
       const encryptedKey = encryptPrivateKey(privateKey, password, encryptionOptions);
       const encKeyPath = join(dataDir, PRIVATE_KEY_ENCRYPTED_FILE);
       await writeFile(encKeyPath, JSON.stringify(encryptedKey, null, 2), { mode: 0o600 });
@@ -368,7 +407,10 @@ export async function initChain(
 
   // Generate key pair
   const { privateKey, publicKey } = await generateKeyPair();
-  await saveKeyPair(dataDir, privateKey, publicKey, keyMode, options.encryptionOptions);
+  await saveKeyPair(dataDir, privateKey, publicKey, {
+    keyMode,
+    encryptionOptions: options.encryptionOptions,
+  });
 
   // Create config
   const config: ChainConfig = {
