@@ -14,8 +14,8 @@ schedule:
   expr: "0 10 * * 0"
   tz: UTC
 
-# Run in isolated session
-sessionTarget: isolated
+# Run in isolated session (doesn't affect main session)
+sessionTarget: "isolated"
 
 payload:
   kind: agentTurn

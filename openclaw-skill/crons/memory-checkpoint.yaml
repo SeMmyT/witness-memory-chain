@@ -14,7 +14,8 @@ schedule:
   everyMs: 3600000  # 1 hour
 
 # Run in isolated session (doesn't affect main session)
-sessionTarget: isolated
+# Note: Agent uses sessions_history tool directly, not HTTP client
+sessionTarget: "isolated"
 
 payload:
   kind: agentTurn

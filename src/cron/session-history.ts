@@ -7,6 +7,32 @@
  * This enables the brain-inspired architecture where:
  * - Main session (hippocampus) encodes experiences
  * - Isolated crons (neocortex during sleep) consolidate memories
+ *
+ * ## Usage Contexts
+ *
+ * **Inside OpenClaw Crons (Primary)**:
+ * The cron YAML prompts instruct the agent to use the `sessions_history` tool
+ * directly. The agent calls `sessions_history(sessionKey, limit)` as a tool,
+ * not via HTTP. This module is NOT used in that flow.
+ *
+ * **Outside OpenClaw (CLI/Testing)**:
+ * When running checkpoint logic from CLI or tests (outside OpenClaw), this
+ * HTTP client fetches session history from the OpenClaw API or falls back
+ * to reading from a session buffer file.
+ *
+ * ```
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │  Inside OpenClaw Cron                                       │
+ * │  Agent uses: sessions_history(sessionKey, limit) ← TOOL     │
+ * │  This module: NOT USED                                      │
+ * └─────────────────────────────────────────────────────────────┘
+ *
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │  Outside OpenClaw (CLI, Tests, External Scripts)            │
+ * │  Uses: fetchSessionHistory() ← HTTP CLIENT (this module)    │
+ * │  Fallback: Session buffer file                              │
+ * └─────────────────────────────────────────────────────────────┘
+ * ```
  */
 
 import type { SessionMessage, SessionHistoryOptions } from './types.js';

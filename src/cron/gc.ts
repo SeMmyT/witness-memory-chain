@@ -46,14 +46,34 @@ function normalize(value: number, max: number): number {
 }
 
 /**
+ * Get tier boost multiplier
+ *
+ * Committed tier items get a significant boost to resist decay,
+ * since they represent permanent commitments and identity.
+ */
+function getTierBoost(tier: string): number {
+  switch (tier) {
+    case 'committed':
+      return 1.5; // 50% boost - committed items resist decay aggressively
+    case 'relationship':
+      return 1.0; // No boost
+    case 'ephemeral':
+      return 0.8; // 20% penalty - ephemeral items decay faster
+    default:
+      return 1.0;
+  }
+}
+
+/**
  * Calculate relevance score for a memory
  *
  * Scoring formula:
  * - 30% recency (exponential decay, 7-day half-life)
  * - 40% access frequency (normalized against max)
  * - 30% importance
+ * - Tier boost: committed (1.5x), relationship (1.0x), ephemeral (0.8x)
  *
- * @returns Score from 0 to 1
+ * @returns Score from 0 to 1 (can exceed 1 with tier boost)
  */
 export function calculateRelevance(
   memory: Memory,
@@ -69,12 +89,17 @@ export function calculateRelevance(
   // Importance: already 0-1
   const importance = memory.importance;
 
-  // Weighted combination
-  return (
+  // Base weighted combination
+  const baseScore = (
     0.30 * recency +
     0.40 * accessScore +
     0.30 * importance
   );
+
+  // Apply tier boost (committed items resist decay)
+  const tierBoost = getTierBoost(memory.tier);
+
+  return baseScore * tierBoost;
 }
 
 /**

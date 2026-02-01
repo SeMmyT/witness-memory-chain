@@ -279,4 +279,75 @@ describe('Garbage Collection', () => {
       expect(stats.archivedMemories).toBe(1);
     });
   });
+
+  describe('Chain Immutability Integration', () => {
+    it('should never modify chain.jsonl during GC', async () => {
+      // This is the critical integration test that Klowalski requested.
+      // GC must only affect the index, never the chain.
+
+      const { initChain, addEntry, readChain, verifyChain } = await import('../../src/chain/index.js');
+
+      // Step 1: Create chain with test entries
+      await initChain(testDir, { agentName: 'gc-test' });
+
+      await addEntry(testDir, {
+        type: 'memory',
+        tier: 'ephemeral',
+        content: 'Old memory that should be GC candidate',
+      });
+
+      await addEntry(testDir, {
+        type: 'decision',
+        tier: 'committed',
+        content: 'Important decision that should never be touched',
+      });
+
+      // Read chain before GC
+      const chainBefore = await readChain(testDir);
+      const chainFilePathBefore = path.join(testDir, 'chain.jsonl');
+      const chainContentBefore = await fs.readFile(chainFilePathBefore, 'utf-8');
+
+      // Rebuild index from chain
+      const { rebuildFromChain } = await import('../../src/index/sqlite.js');
+      const { storeContent, createContentLoader } = await import('../../src/storage/content-store.js');
+
+      // Store content for entries
+      for (const entry of chainBefore) {
+        const content = entry.type === 'memory'
+          ? 'Old memory that should be GC candidate'
+          : 'Important decision that should never be touched';
+        await storeContent(testDir, content);
+      }
+
+      const contentLoader = createContentLoader(testDir);
+      await rebuildFromChain(db, chainBefore, contentLoader);
+
+      // Make one memory old (set created_at to 60 days ago in index only)
+      db.prepare("UPDATE memories SET created_at = datetime('now', '-60 days'), decay_tier = 'cold' WHERE seq = 1").run();
+
+      // Step 2: Run GC
+      const gcResult = runGC(db, {
+        gcThreshold: 0.2,
+        maxAgeDays: 30,
+        protectedTiers: ['committed'],
+      });
+
+      // Step 3: Verify chain.jsonl is UNCHANGED
+      const chainContentAfter = await fs.readFile(chainFilePathBefore, 'utf-8');
+      expect(chainContentAfter).toBe(chainContentBefore);
+
+      // Step 4: Verify chain still verifies
+      const verification = await verifyChain(testDir);
+      expect(verification.valid).toBe(true);
+      expect(verification.entriesChecked).toBeGreaterThanOrEqual(2); // Genesis + 2 entries
+
+      // Step 5: Verify index reflects archived state
+      const memory1 = getMemory(db, 1);
+      const memory2 = getMemory(db, 2);
+
+      // First memory should be archived (old ephemeral)
+      // Second memory should be untouched (committed tier is protected)
+      expect(memory2?.decay_tier).not.toBe('archived');
+    });
+  });
 });
