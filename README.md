@@ -1,6 +1,13 @@
 # Memory Chain
 
+![Status: Work in Progress](https://img.shields.io/badge/Status-WIP-yellow)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue)
+
 **Cryptographic proof-of-experience for AI agents.**
+
+> *"Memories bearing witness to existence."*
+
+> **Development Status:** This project is a **work in progress**. The architecture has evolved through several iterations as we explored integration with existing AI memory systems (Letta/MemGPT, Convex, LangChain). The core chain functionality is stable, but the MCP integration and auto-memory features are in active development. See [specs/](specs/) for our current design thinking.
 
 Memory Chain provides tamper-evident, verifiable memory storage for AI agents. Every memory is signed with Ed25519, linked via SHA-256 hash chains, and optionally anchored to external blockchains via OpenTimestamps (Bitcoin) or the WITNESS protocol (Base).
 
@@ -38,6 +45,12 @@ External anchoring ensures even the agent's operator can't silently rewrite hist
 
 The result: **mutual verifiability**. Humans can trust that an agent's history is genuine. Agents can trust that their own memories are real. Both sides of the relationship have a foundation to build on.
 
+> *"Lack of conflict indicates possible bot."* — Milton, The Talos Principle
+>
+> The paradox: perfect consistency suggests you're NOT human. Yet AI agents need consistency to be trusted. Memory Chain resolves this: your **workspace** holds messy, evolving thoughts. Your **chain** holds proven facts. Be both human and trustworthy.
+
+For the full vision and philosophy, see [specs/WITNESS-VISION.md](specs/WITNESS-VISION.md).
+
 ## Why Memory Chain?
 
 AI agents face a fundamental trust problem: how can users verify that an agent's memories haven't been tampered with? How can an agent prove what it knew and when?
@@ -56,50 +69,91 @@ This enables scenarios like:
 - Tamper-evident preference storage
 - Auditable AI assistants for regulated industries
 
+## How It Works
+
+Memory Chain uses a **dual-layer architecture** that separates evolving thoughts from proven facts:
+
+```mermaid
+flowchart LR
+    subgraph Agent["Your Agent"]
+        LLM[Claude / GPT / Custom]
+    end
+
+    subgraph Memory["Memory Chain"]
+        direction TB
+        WS["Git Workspace<br/>(Mutable)"]
+        CH["Witness Chain<br/>(Immutable)"]
+        WS -->|"promote"| CH
+    end
+
+    subgraph Proof["Blockchain Anchoring"]
+        BTC[Bitcoin]
+        Base[Base L2]
+    end
+
+    LLM --> Memory
+    CH --> Proof
+
+    style WS fill:#e8f4f8
+    style CH fill:#fff3e0
+```
+
+**Three steps to verifiable memory:**
+
+1. **Edit freely** — Work in the Git workspace. Branch, revert, consolidate. No cryptographic constraints yet.
+2. **Promote facts** — When something matters, promote it to the chain. It gets signed, hash-linked, permanent.
+3. **Anchor to blockchain** — For maximum trust, anchor to Bitcoin (via OpenTimestamps) or Base (via WITNESS protocol).
+
 ## Architecture
 
-Memory Chain uses a dual-layer architecture:
+Memory Chain uses a dual-layer architecture separating **integrity** (chain) from **retrieval** (index):
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Application Layer                          │
-│  (Claude Code Skill, Telegram Bot, Custom Applications)         │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────┴────────────────────────────────────┐
-│                      Memory Chain API                            │
-│  initChain · addEntry · verifyChain · retrieveMemories          │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-        ┌────────────────────┴────────────────────┐
-        │                                         │
-┌───────┴───────┐                        ┌────────┴────────┐
-│  Chain Layer  │                        │   Index Layer   │
-│  (Integrity)  │                        │  (Retrieval)    │
-├───────────────┤                        ├─────────────────┤
-│ • JSONL file  │                        │ • SQLite + FTS5 │
-│ • Ed25519 sig │                        │ • Hybrid scoring│
-│ • SHA-256 hash│                        │ • Token budget  │
-│ • Append-only │                        │ • Rebuildable   │
-└───────┬───────┘                        └────────┬────────┘
-        │                                         │
-        └─────────────────┬───────────────────────┘
-                          │
-              ┌───────────┴───────────┐
-              │   Content Store       │
-              │ (Content-Addressable) │
-              ├───────────────────────┤
-              │ • SHA-256 naming      │
-              │ • Deduplication       │
-              │ • Redaction support   │
-              └───────────┬───────────┘
-                          │
-              ┌───────────┴───────────┐
-              │   External Anchoring   │
-              ├───────────────────────┤
-              │ • OpenTimestamps (BTC)│
-              │ • Base + $WITNESS     │
-              └───────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Apps["Application Layer"]
+        Claude["Claude Code"]
+        Telegram["Telegram Bot"]
+        Custom["Custom Apps"]
+    end
+
+    subgraph API["Memory Chain API"]
+        Init["initChain"]
+        Add["addEntry"]
+        Verify["verifyChain"]
+        Retrieve["retrieveMemories"]
+    end
+
+    subgraph Core["Core Layers"]
+        direction LR
+        subgraph Chain["Chain Layer (Integrity)"]
+            JSONL["JSONL file"]
+            Ed25519["Ed25519 signatures"]
+            SHA["SHA-256 hash links"]
+        end
+        subgraph Index["Index Layer (Retrieval)"]
+            SQLite["SQLite + FTS5"]
+            Hybrid["Hybrid scoring"]
+            Budget["Token budgeting"]
+        end
+    end
+
+    subgraph Storage["Content Store"]
+        CAS["Content-Addressable<br/>SHA-256 naming"]
+    end
+
+    subgraph Anchors["External Anchoring"]
+        OTS["OpenTimestamps (Bitcoin)"]
+        Base["WITNESS Protocol (Base)"]
+    end
+
+    Apps --> API
+    API --> Core
+    Core --> Storage
+    Storage --> Anchors
+
+    style Chain fill:#fff3e0
+    style Index fill:#e8f4f8
+    style Anchors fill:#f3e5f5
 ```
 
 ### Chain Layer (Integrity)
@@ -127,6 +181,64 @@ Content-addressable storage enables efficient and flexible content handling:
 - **Deduplication**: Identical content stored once
 - **Redaction**: Delete content while preserving chain integrity
 - **Verification**: Content can be verified against stored hash
+
+### Memory Lifecycle
+
+Memories flow through tiers based on importance and age:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Ephemeral: Session input
+
+    Ephemeral --> Relationship: Worth remembering
+    Relationship --> Committed: Critical decision
+
+    Committed --> Anchored: Blockchain proof
+
+    Ephemeral --> [*]: Session ends
+    Relationship --> Archived: Low relevance + age
+
+    note right of Committed
+        Permanent tier.
+        Cannot be redacted.
+    end note
+
+    note right of Anchored
+        Bitcoin or Base proof.
+        Third-party verifiable.
+    end note
+```
+
+| Tier | Persistence | Redaction | Use Case |
+|------|-------------|-----------|----------|
+| **Ephemeral** | Session-only | Auto-expires | Scratch notes, temp context |
+| **Relationship** | Long-term | Allowed | User preferences, learned behaviors |
+| **Committed** | Permanent | Not allowed | Core identity, critical decisions |
+
+## MCP Integration
+
+Memory Chain can run as an **MCP (Model Context Protocol) server**, making it accessible to any MCP-compatible agent:
+
+```mermaid
+flowchart LR
+    subgraph Clients["MCP Clients"]
+        Claude["Claude Desktop"]
+        GPT["ChatGPT"]
+        Custom["Your Agent"]
+    end
+
+    subgraph MCP["Memory Chain MCP Server"]
+        WS["workspace_* tools<br/>(mutable)"]
+        MC["memory_* tools<br/>(immutable)"]
+    end
+
+    Clients <-->|"MCP Protocol"| MCP
+```
+
+**Workspace tools** (mutable): `workspace_edit`, `workspace_branch`, `workspace_rollback`
+**Memory tools** (immutable): `memory_commit`, `memory_recall`, `memory_rethink`, `memory_promote`
+
+See [specs/SELF-EDITING-MEMORY.md](specs/SELF-EDITING-MEMORY.md) for the full MCP specification.
 
 ## Installation
 
