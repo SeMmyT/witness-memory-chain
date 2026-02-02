@@ -674,6 +674,159 @@ This `git log` is a **readable narrative** of the agent's internal mental groomi
 
 ---
 
+## Security: Branch-Gated Chain Access
+
+### The Problem: Simulation Branch Pollution
+
+What if an agent on a `simulation/evil` branch decides to commit to the immutable chain?
+
+```
+main ────────────────●──────────────────────────
+                      \
+simulation/evil ───────●───── memory_commit("malicious content") ───▶ ❌
+
+Chain now contains experimental/malicious content permanently!
+```
+
+### The Solution: Branch-Gated Access Control
+
+Only approved branches can write to the chain. Simulation branches are **read-only** for chain operations.
+
+```typescript
+// In MCP tool handler
+async function memory_commit(params) {
+  const currentBranch = await git.currentBranch();
+
+  // Only allow chain writes from approved branches
+  const CHAIN_WRITE_BRANCHES = ['main', 'master', 'production'];
+
+  if (!CHAIN_WRITE_BRANCHES.includes(currentBranch)) {
+    throw new Error(
+      `Chain writes blocked on branch '${currentBranch}'. ` +
+      `Simulation branches are read-only for chain. ` +
+      `Merge to main first.`
+    );
+  }
+
+  // Proceed with chain write...
+}
+```
+
+### Access Control Matrix
+
+| Branch Type | Workspace (Git) | Chain Read | Chain Write | Anchor |
+|-------------|-----------------|------------|-------------|--------|
+| `main` / `master` | Full | ✅ | ✅ | ✅ |
+| `simulation/*` | Full | ✅ | ❌ Blocked | ❌ |
+| `experiment/*` | Full | ✅ | ❌ Blocked | ❌ |
+| `feature/*` | Full | ✅ | ⚠️ Requires flag | ❌ |
+
+### Safe Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  SIMULATION WORKFLOW                                                     │
+│                                                                          │
+│  1. Create simulation branch                                            │
+│     $ git checkout -b simulation/pessimist                              │
+│                                                                          │
+│  2. Experiment freely in workspace                                      │
+│     ✅ Edit SOUL.md, MEMORY.md, USER.md                                 │
+│     ✅ memory_recall (read from chain)                                  │
+│     ❌ memory_commit → "Chain writes blocked on simulation/*"           │
+│     ❌ memory_promote → "Chain writes blocked on simulation/*"          │
+│                                                                          │
+│  3. If experiment yields good insights                                  │
+│     $ git checkout main                                                 │
+│     $ git merge simulation/pessimist   # or cherry-pick                 │
+│                                                                          │
+│  4. Now on main, can commit to chain                                    │
+│     ✅ memory_commit (allowed)                                          │
+│     ✅ memory_promote (allowed)                                         │
+│                                                                          │
+│  5. Discard failed experiments                                          │
+│     $ git branch -D simulation/pessimist                                │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Defense in Depth
+
+#### 1. Provenance Tagging
+Even if bypassed, entries are tagged with source branch for audit:
+
+```typescript
+{
+  "seq": 105,
+  "content_hash": "sha256:...",
+  "provenance": {
+    "git_branch": "main",           // Or caught: "simulation/evil"
+    "git_commit": "a7b3c4d5...",
+    "promoted_at": "2026-02-02T..."
+  }
+}
+```
+
+#### 2. Explicit Override for Feature Branches
+Allow feature branch commits with explicit acknowledgment:
+
+```typescript
+memory_commit({
+  content: "...",
+  allowNonMainBranch: true,         // Must explicitly set
+  reason: "Committing from feature/auth before merge"
+})
+```
+
+#### 3. Sandbox Chains (Optional)
+Separate chain storage for experiments:
+
+```
+~/.witness/
+├── chain/              # Main chain (permanent, trusted)
+│   ├── chain.jsonl
+│   └── content/
+└── sandbox/            # Simulation chains (ephemeral)
+    ├── simulation-evil/
+    │   └── chain.jsonl
+    └── experiment-new-personality/
+        └── chain.jsonl
+```
+
+Sandbox chains are never anchored to blockchain.
+
+#### 4. Audit Log
+All chain access attempts are logged:
+
+```typescript
+{
+  "timestamp": "2026-02-02T15:30:00Z",
+  "action": "memory_commit",
+  "branch": "simulation/evil",
+  "result": "BLOCKED",
+  "reason": "Chain writes not allowed on simulation branches"
+}
+```
+
+### Configuration
+
+```yaml
+# ~/.witness/config.yaml
+security:
+  chain_write_branches:
+    - main
+    - master
+    - production
+
+  allow_feature_branch_writes: false  # Require explicit flag
+
+  sandbox_simulation_branches: true   # Use separate chain for simulations
+
+  audit_log: true                     # Log all access attempts
+```
+
+---
+
 ## Implementation Phases
 
 ### Phase 1: Hybrid Storage Foundation
