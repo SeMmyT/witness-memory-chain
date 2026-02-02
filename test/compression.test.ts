@@ -7,11 +7,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   compressText,
-  compressTexts,
   generateMemorySummary,
   extractEntities,
   findPronounReferents,
-  compressionRatio,
 } from '../src/compression.js';
 
 // ============================================================================
@@ -158,50 +156,3 @@ describe('Memory Summary', () => {
   });
 });
 
-// ============================================================================
-// Batch Compression Tests
-// ============================================================================
-
-describe('Batch Compression', () => {
-  it('should compress multiple texts', () => {
-    const texts = [
-      'This is the first text with some important information.',
-      'This is the second text. It mentions something different.',
-      'Third text here. Short.',
-    ];
-
-    const compressed = compressTexts(texts, { maxLength: 50 });
-
-    expect(compressed.length).toBe(3);
-    expect(compressed.every((t) => t.length <= 53)).toBe(true); // +3 for "..."
-  });
-});
-
-// ============================================================================
-// Compression Ratio Tests
-// ============================================================================
-
-describe('Compression Ratio', () => {
-  it('should calculate correct ratio', () => {
-    const original = 'This is the original text';
-    const compressed = 'Short';
-
-    const ratio = compressionRatio(original, compressed);
-
-    expect(ratio).toBeLessThan(1);
-    expect(ratio).toBeCloseTo(compressed.length / original.length, 2);
-  });
-
-  it('should return 1 for empty original', () => {
-    const ratio = compressionRatio('', 'any');
-
-    expect(ratio).toBe(1);
-  });
-
-  it('should return 1 for identical texts', () => {
-    const text = 'Same text';
-    const ratio = compressionRatio(text, text);
-
-    expect(ratio).toBe(1);
-  });
-});

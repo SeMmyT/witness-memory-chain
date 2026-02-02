@@ -16,6 +16,12 @@ export type EntryType = 'memory' | 'identity' | 'decision' | 'redaction';
 /** Memory tiers determine persistence and redaction policy */
 export type Tier = 'committed' | 'relationship' | 'ephemeral';
 
+/** Source of a memory entry for priority handling */
+export type MemorySource = 'auto' | 'manual' | 'curation';
+
+/** Decay tier based on access patterns (for garbage collection) */
+export type DecayTier = 'hot' | 'warm' | 'cold' | 'archived';
+
 /** Key storage modes for different deployment contexts */
 export type KeyMode = 'raw' | 'encrypted' | 'env';
 
@@ -106,6 +112,10 @@ export interface Memory {
   last_accessed: string | null;
   /** Creation timestamp (ISO 8601) */
   created_at: string;
+  /** Decay tier for garbage collection (hot/warm/cold/archived) */
+  decay_tier: DecayTier;
+  /** Source of this memory (auto/manual/curation) */
+  source?: MemorySource;
 }
 
 /** Options for memory retrieval */

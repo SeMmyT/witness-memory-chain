@@ -1,0 +1,116 @@
+# Memory Curation Cron Job
+#
+# Runs weekly to distill daily memory files into MEMORY.md
+# and commit critical items to the chain.
+#
+# This is the "consolidation" phase of the brain-inspired memory architecture.
+# Uses Sonnet for smarter pattern recognition.
+
+name: memory-curation
+
+# Run weekly on Sunday at 10:00 UTC
+schedule:
+  kind: cron
+  expr: "0 10 * * 0"
+  tz: UTC
+
+# Run in isolated session (doesn't affect main session)
+sessionTarget: "isolated"
+
+payload:
+  kind: agentTurn
+  model: anthropic/claude-sonnet-4-5
+  message: |
+    ## Weekly Memory Curation Task
+
+    You are running the weekly memory curation job. Your job is to review
+    the past week's daily memory files, distill them into long-term memory,
+    and commit critical items to the chain.
+
+    ### Step 1: Read Daily Files
+
+    Read the daily memory files from the past 7 days:
+
+    ```
+    memory/2026-01-26.md
+    memory/2026-01-27.md
+    ...
+    memory/2026-02-01.md
+    ```
+
+    Parse each file to extract the captured items.
+
+    ### Step 2: Identify Patterns
+
+    Look for:
+    - **Recurring decisions** — patterns in choices made
+    - **Consistent preferences** — repeated likes/dislikes
+    - **Lessons learned** — insights from events
+    - **Identity statements** — who the user/agent is
+    - **Evolution of views** — how opinions have changed
+
+    ### Step 3: Update MEMORY.md
+
+    Update the curated long-term memory file with distilled learnings:
+
+    ```markdown
+    # Memory — Last updated YYYY-MM-DD
+
+    ## Preferences
+
+    - Prefers Vue.js over React (noted 2026-01-15, confirmed 2026-02-01)
+    - Likes dark mode for late-night work
+
+    ## Decisions
+
+    - Using TypeScript strict mode for all projects
+    - Adopted conventional commits format
+
+    ## Lessons
+
+    - Always run tests before committing
+    - Memory chains need atomic writes
+
+    ## Identity
+
+    - Primary focus: AI agent development
+    - Values: reliability, simplicity, provability
+    ```
+
+    Keep MEMORY.md under 4000 tokens. If it grows too large, prioritize
+    recent and frequently-accessed items (Hot/Warm over Cold).
+
+    ### Step 4: Commit Critical Items to Chain
+
+    For critical items (identity, major decisions, commitments), commit to chain:
+
+    ```bash
+    memory-chain add "<content>" --type decision --tier committed
+    ```
+
+    Only commit items that are:
+    - Identity-defining
+    - Long-term commitments
+    - Major decisions with lasting impact
+
+    ### Step 5: Archive Old Files
+
+    Move daily files older than 30 days to the archive:
+
+    ```
+    memory/archive/2025-12-*.md
+    ```
+
+    ### Step 6: Report
+
+    After processing, report:
+    - Number of daily files processed
+    - Number of items distilled to MEMORY.md
+    - Number of items committed to chain
+    - Number of files archived
+    - Any errors encountered
+
+    ---
+
+    Remember: You are consolidating short-term memories into long-term storage.
+    Focus on patterns and significance, not individual events.

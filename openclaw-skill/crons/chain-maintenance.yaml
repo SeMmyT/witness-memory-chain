@@ -1,0 +1,109 @@
+# Chain Maintenance Cron Job
+#
+# Runs weekly to verify chain integrity, run garbage collection,
+# and anchor if there are significant new entries.
+#
+# This is the "housekeeping" phase of the memory architecture.
+# Uses Sonnet for decision-making about anchoring.
+
+name: chain-maintenance
+
+# Run weekly on Sunday at 11:00 UTC (after curation)
+schedule:
+  kind: cron
+  expr: "0 11 * * 0"
+  tz: UTC
+
+# Run in isolated session (doesn't affect main session)
+sessionTarget: "isolated"
+
+payload:
+  kind: agentTurn
+  model: anthropic/claude-sonnet-4-5
+  message: |
+    ## Weekly Chain Maintenance Task
+
+    You are running the weekly chain maintenance job. Your job is to verify
+    chain integrity, run garbage collection, and anchor if appropriate.
+
+    ### Step 1: Verify Chain Integrity
+
+    Run chain verification:
+
+    ```bash
+    memory-chain verify
+    ```
+
+    Check that:
+    - All hashes are valid
+    - All signatures verify
+    - Sequence numbers are continuous
+    - Content files exist for all entries
+
+    If verification fails, report the errors but DO NOT attempt to fix them.
+    Chain corruption requires manual intervention.
+
+    ### Step 2: Check Stats
+
+    Get current chain statistics:
+
+    ```bash
+    memory-chain stats
+    ```
+
+    Note:
+    - Total entries
+    - Entries by type (memory, decision, identity)
+    - Entries by tier (committed, relationship, ephemeral)
+    - Last anchor time
+
+    ### Step 3: Run Garbage Collection
+
+    Update decay tiers based on access patterns:
+
+    - **Hot**: Accessed in last 7 days
+    - **Warm**: Accessed 8-30 days ago (or high access count)
+    - **Cold**: Not accessed in 30+ days
+
+    Archive memories that:
+    - Are in Cold tier
+    - Have relevance score < 0.2
+    - Are NOT in committed tier (committed = permanent)
+
+    **Important**: GC only affects the index (memory.db).
+    The chain (chain.jsonl) is NEVER modified.
+
+    ### Step 4: Consider Anchoring
+
+    Check if anchoring is appropriate:
+
+    - Count new committed entries since last anchor
+    - If >= 3 new committed entries, consider anchoring
+
+    To anchor:
+
+    ```bash
+    memory-chain anchor --chain base
+    ```
+
+    This creates a provable timestamp on the Base blockchain.
+
+    Only anchor if:
+    - There are significant new committed entries
+    - Previous anchor was successful
+    - WITNESS token balance is sufficient
+
+    ### Step 5: Report
+
+    After processing, report:
+    - Chain verification status (valid/invalid)
+    - Total entries verified
+    - GC results (memories archived)
+    - Decay tier updates (moved to hot/warm/cold)
+    - Anchoring status (anchored/skipped/failed)
+    - Any errors encountered
+
+    ---
+
+    Remember: The chain is sacred. Never modify chain.jsonl.
+    GC only affects the index, which can be rebuilt from the chain.

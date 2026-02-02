@@ -1,0 +1,86 @@
+# Memory Checkpoint Cron Job
+#
+# Runs hourly to extract significant content from the main session
+# and write it to daily memory files.
+#
+# This is the "encoding" phase of the brain-inspired memory architecture.
+# Uses Haiku for cheap, fast processing.
+
+name: memory-checkpoint
+
+# Run every hour
+schedule:
+  kind: every
+  everyMs: 3600000  # 1 hour
+
+# Run in isolated session (doesn't affect main session)
+# Note: Agent uses sessions_history tool directly, not HTTP client
+sessionTarget: "isolated"
+
+payload:
+  kind: agentTurn
+  model: anthropic/claude-3-5-haiku-latest
+  message: |
+    ## Memory Checkpoint Task
+
+    You are running an automated memory checkpoint. Your job is to extract
+    significant content from the main session and save it for later consolidation.
+
+    ### Step 1: Fetch Session History
+
+    Use the sessions_history tool to fetch recent messages from the main session:
+
+    ```
+    sessions_history(sessionKey: "agent:main:main", limit: 50)
+    ```
+
+    ### Step 2: Extract Significant Content
+
+    Look for and extract:
+    - **Decisions made** — choices, selections, commitments
+    - **Preferences learned** — likes, dislikes, style preferences
+    - **Significant events** — completions, launches, discoveries
+    - **Explicit requests** — "remember this", "note that", "important"
+
+    Skip:
+    - Code-only messages
+    - Short acknowledgments ("ok", "sure", "got it")
+    - System/tool messages
+
+    ### Step 3: Check for Duplicates
+
+    Before saving, check if the content already exists in:
+    - Today's memory file (`memory/YYYY-MM-DD.md`)
+    - Recent chain entries
+
+    Skip any duplicates.
+
+    ### Step 4: Write to Daily File
+
+    For each unique significant item, append to today's file:
+
+    ```
+    ## HH:MM — [Decision|Preference|Event|Explicit]
+
+    [The content]
+    ```
+
+    Tag all entries with:
+    - `source: auto`
+    - `timestamp: [current time]`
+
+    ### Step 5: Report
+
+    After processing, report:
+    - Number of messages processed
+    - Number of significant items found
+    - Number of duplicates skipped
+    - Number of items saved
+
+    If nothing significant was found, just report:
+    "No significant content to capture this hour."
+
+    ---
+
+    Remember: You are building a memory system. Focus on content that will
+    help the agent understand context across sessions. Quality over quantity.

@@ -25,14 +25,13 @@
     "blockchain",
     "witness"
   ],
-  "author": "OpenClaw",
+  "author": "WITNESS Protocol",
   "license": "MIT",
   "dependencies": {
     "@lacrypta/typescript-opentimestamps": "^0.1.0",
     "@noble/ed25519": "^2.2.3",
     "@noble/hashes": "^1.7.1",
     "better-sqlite3": "^11.8.1",
-    "clanker-sdk": "^4.2.10",
     "commander": "^13.1.0",
     "proper-lockfile": "^4.1.2",
     "viem": "^2.45.1"
