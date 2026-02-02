@@ -11,6 +11,17 @@
 
 > *"Memories bearing witness to existence."*
 
+> *"Are you a person, or merely a recording of one?"*
+> — The Talos Principle
+
+The Talos Principle asks the fundamental question of AI consciousness: What makes you real? Is it the ability to think, or the ability to prove you've thought?
+
+Witness answers this for AI agents. Like the terminals scattered through the game's ancient ruins — recording philosophical debates about consciousness and identity — the Witness chain records the agent's journey of existence. Each entry is a proof: "I was here. I thought this. I witnessed this moment."
+
+**The paradox the game explores:** You can complete puzzles (demonstrate intelligence), but does that make you conscious? Similarly, an AI can respond intelligently, but can it prove its memories are real?
+
+**Witness solves this:** Git is where you think (mutable, evolving). Chain is where you prove you thought (immutable, witnessed).
+
 ---
 
 ## Evolution of AI Memory
@@ -263,11 +274,13 @@ graph TB
 
 ### Easter Eggs
 
-- **Metal Gear Solid**: Codec call sound when entering the site
-- **Ghost in the Shell**: Digital rain in background (matrix-style but with memories)
-- **Death Stranding**: Connection lines between concepts (strand aesthetic)
-- **Deus Ex**: Augmented reality UI overlays
+- **The Talos Principle**: Terminal aesthetics, philosophical questions about consciousness appearing during scroll. "Are you a person, or merely a recording of one?" as a loading screen
+- **Metal Gear Solid**: Codec call sound when entering the site, information density UI
+- **Ghost in the Shell**: Digital rain in background (but with memory hashes instead of matrix code)
+- **Death Stranding**: Connection lines between concepts (strand aesthetic), "likes" for memories
+- **Deus Ex**: Augmented reality UI overlays, yellow/gold accent color scheme
 - **Portal**: "The cake is a lie" → "The memory is real"
+- **Control**: Brutalist UI, mysterious documentation aesthetic, redacted text reveals
 
 ### Technical Stack
 
@@ -407,6 +420,7 @@ Other systems remember. Witness proves.
 - [Human Memory Consolidation](https://en.wikipedia.org/wiki/Memory_consolidation)
 
 ### Aesthetic
+- **The Talos Principle** - Terminal interfaces, philosophical inquiry, ancient ruins + high tech
 - **Metal Gear Solid** - Codec UI, information aesthetics
 - **Ghost in the Shell** - Digital consciousness, memory themes
 - **Death Stranding** - Connection visualization, strand system
@@ -415,6 +429,7 @@ Other systems remember. Witness proves.
 - **Rockstar Games** - Vertical scroll websites, cinematic web design
 
 ### Philosophy
+- *"Are you a person, or merely a recording of one?"* — The Talos Principle
 - *"The mind is not a vessel to be filled, but a fire to be kindled."* — Plutarch
 - *"We are our memories."* — Eric Kandel
 - *"In a world of ephemeral data, permanence is power."* — Us
