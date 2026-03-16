@@ -240,6 +240,185 @@ flowchart LR
 
 See [specs/SELF-EDITING-MEMORY.md](specs/SELF-EDITING-MEMORY.md) for the full MCP specification.
 
+## Connect Claude Desktop, Phone, and Claude Code
+
+Memory Chain bridges all your Claude surfaces through one signed memory store:
+
+```
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│  Claude Desktop  │     │   Claude Phone   │     │   Claude Code    │
+│  (claude.ai)     │     │   (iOS/Android)  │     │   (CLI)          │
+│                  │     │                  │     │                  │
+│  MCP tools:      │     │  Reads memories  │     │  Hooks:          │
+│  memory_add      │     │  via Desktop     │     │  chain-commit    │
+│  memory_search   │     │  sync            │     │  chain-bootstrap │
+│  memory_recall   │     │                  │     │  chain-bridge    │
+│  memory_verify   │     │                  │     │                  │
+└────────┬─────────┘     └────────┬─────────┘     └────────┬─────────┘
+         │                        │                         │
+         └────────────────────────┼─────────────────────────┘
+                                  │
+                    ┌─────────────▼──────────────┐
+                    │   ~/.claude/memory-chain/  │
+                    │                            │
+                    │   chain.jsonl (signed)     │
+                    │   content/ (CAS)           │
+                    │   memory.db (FTS5 index)   │
+                    │   agent.key (Ed25519)      │
+                    └────────────────────────────┘
+```
+
+**The loop:**
+1. **Claude Code** writes to the chain automatically via hooks — session distillations, decisions, aftermath tags
+2. **Claude Desktop / claude.ai** reads from the chain via MCP — search, recall, list memories
+3. **Claude Desktop** can also write — add memories, decisions, preferences during conversations
+4. **Claude Phone** gets memories through Desktop sync — same MCP server, same chain
+5. **Every entry** is Ed25519 signed, SHA-256 hash-linked, and optionally anchored to Bitcoin/Base
+
+Your morning phone conversation with Claude remembers what your coding session learned last night. Your Claude Desktop chat can verify decisions made in Claude Code. One chain, all surfaces, cryptographically proven.
+
+### MCP Server Setup
+
+The MCP server exposes 6 tools to Claude Desktop:
+
+| Tool | Purpose |
+|------|---------|
+| `memory_add` | Sign and store a new memory (fact, decision, preference) |
+| `memory_search` | Hybrid retrieval — keyword + recency + importance scoring |
+| `memory_recall` | Context-aware retrieval for current conversation topic |
+| `memory_list` | Browse recent chain entries with content previews |
+| `memory_verify` | Verify cryptographic integrity of entire chain |
+| `memory_stats` | Chain statistics — entries by type/tier, storage usage |
+
+**Configure Claude Desktop** (`claude_desktop_config.json`):
+
+<details>
+<summary>macOS</summary>
+
+```json
+{
+  "mcpServers": {
+    "witness-memory-chain": {
+      "command": "node",
+      "args": ["/path/to/memory-chain/dist/mcp-server.js"],
+      "env": {
+        "MEMORY_CHAIN_DIR": "~/.claude/memory-chain"
+      }
+    }
+  }
+}
+```
+Config location: `~/Library/Application Support/Claude/claude_desktop_config.json`
+</details>
+
+<details>
+<summary>Windows (with WSL2)</summary>
+
+```json
+{
+  "mcpServers": {
+    "witness-memory-chain": {
+      "command": "wsl",
+      "args": [
+        "node",
+        "/home/youruser/path/to/memory-chain/dist/mcp-server.js"
+      ],
+      "env": {
+        "MEMORY_CHAIN_DIR": "/home/youruser/.claude/memory-chain"
+      }
+    }
+  }
+}
+```
+Config location: `%APPDATA%\Claude\claude_desktop_config.json`
+</details>
+
+<details>
+<summary>Linux</summary>
+
+```json
+{
+  "mcpServers": {
+    "witness-memory-chain": {
+      "command": "node",
+      "args": ["/home/youruser/path/to/memory-chain/dist/mcp-server.js"],
+      "env": {
+        "MEMORY_CHAIN_DIR": "/home/youruser/.claude/memory-chain"
+      }
+    }
+  }
+}
+```
+Config location: `~/.config/Claude/claude_desktop_config.json`
+</details>
+
+After adding the config, restart Claude Desktop. The memory tools will appear in the tool picker.
+
+### Claude Code Hooks Setup
+
+Claude Code connects to the same chain via hooks — no MCP needed:
+
+```bash
+# Initialize the chain (once)
+node dist/cli.js init --name "Ghost" -d ~/.claude/memory-chain
+
+# Copy hooks to your Claude Code hooks directory
+cp hooks/chain-commit.sh ~/.claude/hooks/
+cp hooks/chain-bootstrap.sh ~/.claude/hooks/
+cp hooks/chain-bridge.sh ~/.claude/hooks/
+```
+
+Register in `~/.claude/settings.json`:
+```json
+{
+  "hooks": {
+    "SessionStart": [{
+      "matcher": "*",
+      "hooks": [{
+        "type": "command",
+        "command": "bash ~/.claude/hooks/chain-bootstrap.sh",
+        "timeout": 8
+      }]
+    }],
+    "SessionEnd": [{
+      "hooks": [{
+        "type": "command",
+        "command": "bash ~/.claude/hooks/chain-commit.sh",
+        "timeout": 10
+      }]
+    }]
+  }
+}
+```
+
+Now every Claude Code session automatically:
+- **Reads** from the chain at session start (bootstrap)
+- **Writes** distillations and decisions at session end (commit)
+
+### Example: Cross-Surface Memory
+
+**Claude Code session** (coding):
+```
+> Fixed the auth middleware race condition by adding mutex lock.
+  [chain-commit: signed entry #47, memory/committed]
+```
+
+**Claude Desktop** (next morning):
+```
+You: What did I work on yesterday?
+Claude: [uses memory_search] Yesterday you fixed an auth middleware
+        race condition by adding a mutex lock (chain entry #47,
+        cryptographically signed at 2026-03-16 23:41 UTC).
+```
+
+**Claude Phone** (on the go):
+```
+You: Remind me about that auth fix — what was the approach?
+Claude: [uses memory_recall] The auth middleware had a race condition.
+        You resolved it with a mutex lock. This is from your signed
+        memory chain, entry #47.
+```
+
 ## Installation
 
 ```bash
