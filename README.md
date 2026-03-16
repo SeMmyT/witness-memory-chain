@@ -1,7 +1,7 @@
 # Memory Chain
 
 ![Status: Work in Progress](https://img.shields.io/badge/Status-WIP-yellow)
-![License: MIT](https://img.shields.io/badge/License-MIT-blue)
+![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue)
 
 **Cryptographic proof-of-experience for AI agents.**
 
@@ -583,6 +583,118 @@ if (result.success) {
 }
 ```
 
+## Claude Code Hooks Integration
+
+Memory Chain can be wired directly into Claude Code's hook system for automatic cross-session memory. This creates a closed loop: memories are committed at session end and bootstrapped at session start.
+
+### The Loop
+
+```
+SESSION START
+  └─ chain-bootstrap.sh (SessionStart hook)
+       └─ Queries chain for project-specific + recent memories
+       └─ Writes chain-memories.md to project memory dir
+       └─ Auto-loaded into Ghost's context
+
+SESSION RUNS
+  └─ Ghost has signed memories in context
+  └─ Can verify provenance: "I know this because chain entry #47"
+
+SESSION END
+  └─ chain-commit.sh (SessionEnd hook)
+       └─ Reads latest session distillation from recent.md
+       └─ Reads session aftermath (friction, outcome, pattern)
+       └─ Signs and appends to chain
+  └─ chain-bridge.sh (called by other hooks)
+       └─ Plan divergence events → decision/committed
+```
+
+### Hook Scripts
+
+**`chain-commit.sh`** (SessionEnd) — Captures session output:
+```bash
+#!/usr/bin/env bash
+# Reads recent.md (if modified <5 min ago) and Sifr aftermath,
+# commits both to the chain as signed entries.
+# Fire-and-forget: SessionEnd can't block.
+
+CHAIN_DIR="$HOME/.claude/memory-chain"
+CHAIN_CLI="$HOME/path/to/memory-chain/dist/cli.js"
+
+# ... reads recent.md latest entry → memory/committed
+# ... reads session aftermath → memory/relationship
+```
+
+**`chain-bootstrap.sh`** (SessionStart) — Injects memories:
+```bash
+#!/usr/bin/env bash
+# Queries chain for project-specific + recent memories,
+# writes chain-memories.md to project memory dir.
+# The file is auto-loaded as project memory by Claude Code.
+
+# Searches for:
+# 1. Project-specific memories (by project name)
+# 2. Recent session distillations
+# 3. Plan divergence decisions
+# Writes results to ~/.claude/projects/<project>/memory/chain-memories.md
+```
+
+**`chain-bridge.sh`** — Helper for other hooks:
+```bash
+#!/usr/bin/env bash
+# Usage: chain-bridge.sh <type> <tier> <content>
+# Called by valuable.sh when plan divergence detected.
+# Writes decision/committed entries to the chain.
+```
+
+### Settings Registration
+
+Add to `~/.claude/settings.json`:
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [{
+          "type": "command",
+          "command": "bash ~/.claude/hooks/chain-bootstrap.sh",
+          "timeout": 8
+        }]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [{
+          "type": "command",
+          "command": "bash ~/.claude/hooks/chain-commit.sh",
+          "timeout": 10
+        }]
+      }
+    ]
+  }
+}
+```
+
+### Output Format
+
+`chain-memories.md` (auto-generated, auto-loaded):
+```markdown
+---
+name: Chain Memories
+description: Cryptographically signed memories from the chain.
+type: project
+---
+
+Relevant memories from the signed chain (queried 2026-03-16 09:03):
+
+- [Memory] [session-distill] Built prefab system with 35 extracted modules
+- [Memory] [session-aftermath] ecomlanding | friction=low, outcome=resolved
+- [Decision] [plan-divergence] Structural divergence in revisper audio pipeline
+
+*3 memories from chain. Verify: `memory-chain verify -d ~/.claude/memory-chain`*
+```
+
 ## Claude Code Skill Integration
 
 Memory Chain includes a Claude Code skill for Telegram-based agents:
@@ -782,7 +894,7 @@ Test coverage includes:
 
 ## License
 
-MIT
+Apache 2.0 — Ghost & SeMmy & Klowalski
 
 ## Contributing
 
